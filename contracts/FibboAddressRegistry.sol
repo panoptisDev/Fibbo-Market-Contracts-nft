@@ -15,7 +15,11 @@ contract FibboAddressRegistry is OwnableUpgradeable {
     /// @notice FibboMarketplace contract
     address public marketplace;
 
+    /// @notice FibboMarketplace contract
     address public community;
+
+    /// @notice FibboMarketplace contract
+    address public verification;
 
     /// @notice Contract initializer
     function initialize() public initializer {
@@ -51,5 +55,14 @@ contract FibboAddressRegistry is OwnableUpgradeable {
      */
     function updateCommunity(address _community) external onlyOwner {
         community = _community;
+    }
+
+    /**
+     @notice Update FibboVerification contract
+     @dev Only admin
+     */
+
+    function updateVerification(address _verification) external onlyOwner {
+        verification = _verification;
     }
 }

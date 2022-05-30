@@ -79,7 +79,34 @@ async function main(network) {
 
   ////
 
-  ///NFT Collections deployement
+  //// Verification Deployement
+  const Verification = await ethers.getContractFactory("FibboVerification");
+  const verificationImpl = await Verification.deploy(MARKETPLACE_ADDRESS);
+  await verificationImpl.deployed();
+
+  console.log("Verification deployed to: ", verificationImpl.address);
+
+  const verificationProxy = await AdminUpgradeabilityProxy.deploy(
+    verificationImpl.address,
+    PROXY_ADDRESS,
+    []
+  );
+  await verificationProxy.deployed();
+
+  console.log("Community Proxy deployed at: ", comunityImpl.address);
+  const VERIFICATION_ADDRESS = verificationProxy.address;
+
+  const verification = await ethers.getContractAt(
+    "FibboVerification",
+    VERIFICATION_ADDRESS
+  );
+
+  await verification.initialize();
+
+  console.log("Verification proxy initalized");
+  ////
+
+  //// NFT Collections deployement
   const DefaultCollection = await ethers.getContractFactory("DefaultFibbo");
   const defaultCollection = await DefaultCollection.deploy(MARKETPLACE_ADDRESS);
   await defaultCollection.deployed();
@@ -117,11 +144,13 @@ async function main(network) {
 
   console.log("AddressRegistry proxy initalized");
 
+  await defaultCollection.updateFibboVerification(VERIFICATION_ADDRESS);
   await marketplace.updateAddressRegistry(ADDRESS_REGISTRY);
 
   await addressRegistry.updateFibboCollection(defaultCollection.address);
   await addressRegistry.updateMarketplace(marketplace.address);
   await addressRegistry.updateCommunity(community.address);
+  await addressRegistry.updateVerification(verification.address);
 
   console.log("AddressRegistry has been filled");
   ////

@@ -5,10 +5,23 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
+interface IFibboVerification {
+    function checkIfVerified(address) external view returns (bool);
+}
+
 contract DefaultFibbo is ERC721URIStorage {
     using Counters for Counters.Counter;
     Counters.Counter public _tokenIds;
     address contractAddress;
+
+    /// @notice Fibbo Address Verfification
+    IFibboVerification public fibboVerification;
+
+    modifier isVerifiedAddress(address _address) {
+        bool verified = fibboVerification.checkIfVerified(_address);
+        require(verified, "This address is not a verified artist!");
+        _;
+    }
 
     constructor(address marketplaceAddress)
         ERC721("Fibbo Default Collection", "FBODEF")
@@ -16,7 +29,11 @@ contract DefaultFibbo is ERC721URIStorage {
         contractAddress = marketplaceAddress;
     }
 
-    function createToken(string memory tokenURI) public returns (uint256) {
+    function createToken(string memory tokenURI)
+        public
+        isVerifiedAddress(msg.sender)
+        returns (uint256)
+    {
         _tokenIds.increment();
         uint256 newItemId = _tokenIds.current();
 
@@ -24,5 +41,9 @@ contract DefaultFibbo is ERC721URIStorage {
         _setTokenURI(newItemId, tokenURI);
         setApprovalForAll(contractAddress, true);
         return newItemId;
+    }
+
+    function updateFibboVerification(address _verification) external {
+        fibboVerification = IFibboVerification(_verification);
     }
 }
