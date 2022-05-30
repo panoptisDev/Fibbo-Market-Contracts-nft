@@ -14,20 +14,20 @@ async function main(network) {
     ADDRESS_REGISTRY
   );
 
-  const marketAddress = await addressRegistry.marketplace();
+  const communityAddress = await addressRegistry.community();
 
-  const marketplaceProxy = await ethers.getContractAt(
-    "FibboMarketplace",
-    marketAddress
+  const communityProxy = await ethers.getContractAt(
+    "FibboCommunity",
+    communityAddress
   );
 
-  const Marketplace = await ethers.getContractFactory("FibboMarketplace");
-  const marketplaceImpl = await Marketplace.deploy();
-  await marketplaceImpl.deployed();
+  const Community = await ethers.getContractFactory("FibboCommunity");
+  const communityImpl = await Community.deploy();
+  await communityImpl.deployed();
 
-  console.log("FibboMarkeplace deployed to: ", marketplaceImpl.address);
+  console.log("FibboMarkeplace deployed to: ", communityImpl.address);
 
-  await proxyAdmin.upgrade(marketplaceProxy.address, marketplaceImpl.address);
+  await proxyAdmin.upgrade(communityProxy.address, communityImpl.address);
 }
 
 main(network)

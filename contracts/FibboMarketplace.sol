@@ -7,6 +7,14 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
+interface IFibboAddressRegistry {
+    function fibboCollection() external view returns (address);
+
+    function marketplace() external view returns (address);
+
+    function community() external view returns (address);
+}
+
 contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using AddressUpgradeable for address payable;
 
@@ -46,6 +54,10 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     /// @notice Platform fee receipient
     address payable public feeReceipient;
     /// @notice NftAddress -> Token ID -> Minter
+
+    /// @notice Address registry
+    IFibboAddressRegistry public addressRegistry;
+
     mapping(address => mapping(uint256 => address)) public minters;
 
     mapping(address => mapping(uint256 => uint16)) public royalties;
@@ -166,10 +178,6 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         delete (listings[_nftContract][_tokenId][msg.sender]);
     }
 
-    function test() public view returns (uint256) {
-        return 1000000;
-    }
-
     /// @notice Method for updating listed NFT
     /// @param _nftContract Address of NFT contract
     /// @param _tokenId Token ID of NFT
@@ -268,5 +276,13 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     {
         feeReceipient = _platformFeeRecipient;
         emit UpdatePlatformFeeRecipient(_platformFeeRecipient);
+    }
+
+    /**
+     @notice Update FantomAddressRegistry contract
+     @dev Only admin
+     */
+    function updateAddressRegistry(address _registry) external onlyOwner {
+        addressRegistry = IFibboAddressRegistry(_registry);
     }
 }

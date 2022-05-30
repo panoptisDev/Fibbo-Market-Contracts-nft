@@ -26,7 +26,6 @@ async function main(network) {
   ////
 
   //// Marketplace deployement
-
   const Marketplace = await ethers.getContractFactory("FibboMarketplace");
   const marketplaceImpl = await Marketplace.deploy();
   await marketplaceImpl.deployed();
@@ -52,11 +51,80 @@ async function main(network) {
   console.log("Marketplace Proxy Initialized");
   ////
 
+  //// Community deployement
+  const Community = await ethers.getContractFactory("FibboCommunity");
+  const comunityImpl = await Community.deploy();
+  await comunityImpl.deployed();
+
+  console.log("FibboCommunity deployed to: ", comunityImpl.address);
+
+  const communityProxy = await AdminUpgradeabilityProxy.deploy(
+    comunityImpl.address,
+    PROXY_ADDRESS,
+    []
+  );
+  await communityProxy.deployed();
+
+  console.log("Community Proxy deployed at: ", comunityImpl.address);
+  const COMMUNITY_ADDRESS = communityProxy.address;
+
+  const community = await ethers.getContractAt(
+    "FibboCommunity",
+    COMMUNITY_ADDRESS
+  );
+
+  await community.initialize();
+
+  console.log("Community proxy initalized");
+
+  ////
+
   ///NFT Collections deployement
   const DefaultCollection = await ethers.getContractFactory("DefaultFibbo");
   const defaultCollection = await DefaultCollection.deploy(MARKETPLACE_ADDRESS);
   await defaultCollection.deployed();
   console.log("DefaultCollection deploted to: ", defaultCollection.address);
+  ////
+
+  //// AddressRegistry deployement
+  const AddressRegistry = await ethers.getContractFactory(
+    "FibboAddressRegistry"
+  );
+  const addressRegistryImpl = await AddressRegistry.deploy();
+  await addressRegistryImpl.deployed();
+
+  console.log("AddressRegistry deployed to: ", addressRegistryImpl.address);
+
+  const addressRegistryProxy = await AdminUpgradeabilityProxy.deploy(
+    addressRegistryImpl.address,
+    PROXY_ADDRESS,
+    []
+  );
+  await addressRegistryProxy.deployed();
+
+  console.log(
+    "AddressRegistry Proxy deployed at: ",
+    addressRegistryProxy.address
+  );
+  const ADDRESS_REGISTRY = addressRegistryProxy.address;
+
+  const addressRegistry = await ethers.getContractAt(
+    "FibboAddressRegistry",
+    ADDRESS_REGISTRY
+  );
+
+  await addressRegistry.initialize();
+
+  console.log("AddressRegistry proxy initalized");
+
+  await marketplace.updateAddressRegistry(ADDRESS_REGISTRY);
+
+  await addressRegistry.updateFibboCollection(defaultCollection.address);
+  await addressRegistry.updateMarketplace(marketplace.address);
+  await addressRegistry.updateCommunity(community.address);
+
+  console.log("AddressRegistry has been filled");
+  ////
 }
 
 // We recommend this pattern to be able to use async/await everywhere
