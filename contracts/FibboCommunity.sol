@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract FibboCommunity is OwnableUpgradeable {
+contract FibboCommunity is Ownable {
     using Counters for Counters.Counter;
     Counters.Counter public suggestionsIds;
     Counters.Counter public finishedSuggestionsCount;
@@ -59,9 +59,8 @@ contract FibboCommunity is OwnableUpgradeable {
     event SuggestionCompleted(uint256 suggestionId, Suggestion suggestion);
 
     /// @notice Contract initializer
-    function initialize(uint16 _proposerFee) public initializer {
+    constructor(uint16 _proposerFee) {
         proposerFee = _proposerFee;
-        __Ownable_init();
     }
 
     modifier suggestionExists(uint256 _suggestionId) {

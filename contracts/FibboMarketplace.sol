@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface IFibboAddressRegistry {
     function fibboCollection() external view returns (address);
@@ -15,8 +16,8 @@ interface IFibboAddressRegistry {
     function community() external view returns (address);
 }
 
-contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
-    using AddressUpgradeable for address payable;
+contract FibboMarketplace is Ownable, ReentrancyGuard {
+    //using AddressUpgradeable for address payable;
 
     event ItemListed(
         address indexed owner,
@@ -71,15 +72,9 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         public offers;
 
     /// @notice Contract initializer
-    function initialize(address payable _feeRecipient, uint16 _platformFee)
-        public
-        initializer
-    {
+    constructor(address payable _feeRecipient, uint16 _platformFee) {
         platformFee = _platformFee;
         feeReceipient = _feeRecipient;
-
-        __Ownable_init();
-        __ReentrancyGuard_init();
     }
 
     modifier isListed(

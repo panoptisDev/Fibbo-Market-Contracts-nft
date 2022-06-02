@@ -4,13 +4,11 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract FibboVerification is OwnableUpgradeable {
+contract FibboVerification is Ownable {
     mapping(address => bool) verifiedArtists;
 
     /// @notice Contract initializer
-    function initialize() public initializer {
-        __Ownable_init();
-    }
+    constructor() {}
 
     modifier isNotVerified(address _address) {
         bool verified = verifiedArtists[_address];
