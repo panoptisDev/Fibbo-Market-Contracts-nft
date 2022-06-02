@@ -6,6 +6,10 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
+interface IFibboVerification {
+    function checkIfVerified(address) external view returns (bool);
+}
+
 contract FibboCommunity is Ownable {
     using Counters for Counters.Counter;
     Counters.Counter public suggestionsIds;
@@ -18,6 +22,8 @@ contract FibboCommunity is Ownable {
     mapping(uint256 => uint256) public suggestionsProgress;
     mapping(uint256 => FinishedSuggestion) public finishedSuggestions;
     mapping(uint256 => WithdrawedSuggestion) public withdrawedSuggestions;
+
+    IFibboVerification public fibboVerification;
 
     struct Suggestion {
         uint256 suggestionId;
@@ -104,6 +110,9 @@ contract FibboCommunity is Ownable {
         require(_totalAmount > 10, "Total amount must be higher than 10!");
         require(proposer != address(0), "Address proposer is not valid");
 
+        bool isVerifiedAddress = fibboVerification.checkIfVerified(proposer);
+        require(isVerifiedAddress, "Address is not verified!");
+
         suggestionsIds.increment();
 
         uint256 newSuggestionId = suggestionsIds.current();
@@ -127,6 +136,10 @@ contract FibboCommunity is Ownable {
     {
         Suggestion memory _sugg = suggestions[_suggestionId];
         uint256 progress = suggestionsProgress[_suggestionId];
+
+        bool isVerifiedArtist = fibboVerification.checkIfVerified(msg.sender);
+
+        require(isVerifiedArtist, "Sender is not a verified address!");
 
         uint256 newProgress = progress + msg.value;
 
@@ -256,5 +269,9 @@ contract FibboCommunity is Ownable {
         }
 
         return result;
+    }
+
+    function updateFibboVerification(address _verification) external onlyOwner {
+        fibboVerification = IFibboVerification(_verification);
     }
 }

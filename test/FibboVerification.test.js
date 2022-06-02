@@ -50,6 +50,21 @@ contract(
           from: owner,
         });
       });
+
+      it("reverts when we try to mint with unverified address", async function () {
+        await expectRevert(
+          this.nft.createToken("ipfs", { from: toVerificate }),
+          "This address is not a verified artist!"
+        );
+      });
+
+      it("succesfully minted item once verificated ", async function () {
+        await this.verification.verificateAddress(toVerificate, {
+          from: owner,
+        });
+
+        await this.nft.createToken("ipfs", { from: toVerificate });
+      });
     });
 
     async function getGasCosts(receipt) {

@@ -4,12 +4,13 @@ pragma solidity ^0.8.6;
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface IFibboVerification {
     function checkIfVerified(address) external view returns (bool);
 }
 
-contract DefaultFibbo is ERC721URIStorage {
+contract DefaultFibbo is ERC721URIStorage, Ownable {
     using Counters for Counters.Counter;
     Counters.Counter public _tokenIds;
     address contractAddress;
@@ -43,7 +44,7 @@ contract DefaultFibbo is ERC721URIStorage {
         return newItemId;
     }
 
-    function updateFibboVerification(address _verification) external {
+    function updateFibboVerification(address _verification) external onlyOwner {
         fibboVerification = IFibboVerification(_verification);
     }
 }
