@@ -2,6 +2,8 @@
 // run: npx hardhat node on a terminal
 // then run: npx hardhat run --network localhost scripts/12_deploy_all.js
 
+const { getConstants } = require("./constants");
+
 async function main(network) {
   console.log("Network is ", network.name);
 
@@ -9,7 +11,7 @@ async function main(network) {
   const deployerAddress = await deployer.getAddress();
   console.log(`Deployer's address: `, deployerAddress);
 
-  const { TREASURY_ADDRESS, PLATFORM_FEE } = require("./constants");
+  const { TREASURY_ADDRESS, PLATFORM_FEE } = getConstants(network);
 
   //// Proxy deployement
   const ProxyAdmin = await ethers.getContractFactory("ProxyAdmin");
@@ -73,7 +75,7 @@ async function main(network) {
     COMMUNITY_ADDRESS
   );
 
-  await community.initialize();
+  await community.initialize(PLATFORM_FEE);
 
   console.log("Community proxy initalized");
 
@@ -81,7 +83,7 @@ async function main(network) {
 
   //// Verification Deployement
   const Verification = await ethers.getContractFactory("FibboVerification");
-  const verificationImpl = await Verification.deploy(MARKETPLACE_ADDRESS);
+  const verificationImpl = await Verification.deploy();
   await verificationImpl.deployed();
 
   console.log("Verification deployed to: ", verificationImpl.address);

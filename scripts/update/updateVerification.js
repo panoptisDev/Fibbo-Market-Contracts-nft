@@ -16,20 +16,20 @@ async function main(network) {
     ADDRESS_REGISTRY
   );
 
-  const communityAddress = await addressRegistry.community();
+  const verificationAddress = await addressRegistry.verification();
 
-  const communityProxy = await ethers.getContractAt(
-    "FibboCommunity",
-    communityAddress
+  const verificationProxy = await ethers.getContractAt(
+    "FibboVerification",
+    verificationAddress
   );
 
-  const Community = await ethers.getContractFactory("FibboCommunity");
-  const communityImpl = await Community.deploy();
-  await communityImpl.deployed();
+  const Verification = await ethers.getContractFactory("FibboVerification");
+  const verificationImpl = await Verification.deploy();
+  await verificationImpl.deployed();
 
-  console.log("FibboMarkeplace deployed to: ", communityImpl.address);
+  console.log("FibboVerification deployed to: ", verificationImpl.address);
 
-  await proxyAdmin.upgrade(communityProxy.address, communityImpl.address);
+  await proxyAdmin.upgrade(verificationProxy.address, verificationImpl.address);
 }
 
 main(network)

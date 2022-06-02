@@ -175,6 +175,7 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         nonReentrant
         isListed(_nftContract, _tokenId, msg.sender)
     {
+        _validOwner(_nftContract, _tokenId, msg.sender);
         delete (listings[_nftContract][_tokenId][msg.sender]);
     }
 
@@ -196,6 +197,8 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         address payable _owner
     ) external payable nonReentrant isListed(_nftContract, _tokenId, _owner) {
         uint256 price = listings[_nftContract][_tokenId][_owner];
+
+        require(msg.value >= price, "Not enough to buy item");
 
         uint256 feeAmount = (price * platformFee) / 10000;
 

@@ -21,11 +21,20 @@ contract FibboVerification is OwnableUpgradeable {
     function verificateAddress(address _toVerificate)
         external
         isNotVerified(_toVerificate)
+        onlyOwner
     {
         verifiedArtists[_toVerificate] = true;
     }
 
     function checkIfVerified(address _address) public view returns (bool) {
         return verifiedArtists[_address];
+    }
+
+    function unverifyAddress(address _toVerificate)
+        external
+        isNotVerified(_toVerificate)
+        onlyOwner
+    {
+        delete verifiedArtists[_toVerificate];
     }
 }

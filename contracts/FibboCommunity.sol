@@ -12,6 +12,8 @@ contract FibboCommunity is OwnableUpgradeable {
     Counters.Counter public finishedSuggestionsCount;
     Counters.Counter public withdrawedSuggestionsCount;
 
+    uint16 public proposerFee;
+
     mapping(uint256 => Suggestion) public suggestions;
     mapping(uint256 => uint256) public suggestionsProgress;
     mapping(uint256 => FinishedSuggestion) public finishedSuggestions;
@@ -19,7 +21,7 @@ contract FibboCommunity is OwnableUpgradeable {
 
     struct Suggestion {
         uint256 suggestionId;
-        address payable creator;
+        address payable proposer;
         uint256 totalAmount;
         string title;
         string description;
@@ -27,6 +29,7 @@ contract FibboCommunity is OwnableUpgradeable {
 
     struct SuggestionInProgress {
         uint256 suggestionId;
+        address payable proposer;
         string title;
         string description;
         uint256 totalAmount;
@@ -56,14 +59,15 @@ contract FibboCommunity is OwnableUpgradeable {
     event SuggestionCompleted(uint256 suggestionId, Suggestion suggestion);
 
     /// @notice Contract initializer
-    function initialize() public initializer {
+    function initialize(uint16 _proposerFee) public initializer {
+        proposerFee = _proposerFee;
         __Ownable_init();
     }
 
     modifier suggestionExists(uint256 _suggestionId) {
         Suggestion memory _suggestion = suggestions[_suggestionId];
         require(
-            _suggestion.creator != address(0),
+            _suggestion.proposer != address(0),
             "Suggestion does not exist!"
         );
 
@@ -95,9 +99,11 @@ contract FibboCommunity is OwnableUpgradeable {
     function createSuggestion(
         string memory _title,
         string memory _desc,
-        uint256 _totalAmount
+        uint256 _totalAmount,
+        address proposer
     ) external onlyOwner {
         require(_totalAmount > 10, "Total amount must be higher than 10!");
+        require(proposer != address(0), "Address proposer is not valid");
 
         suggestionsIds.increment();
 
@@ -105,7 +111,7 @@ contract FibboCommunity is OwnableUpgradeable {
 
         suggestions[newSuggestionId] = Suggestion(
             newSuggestionId,
-            payable(msg.sender),
+            payable(proposer),
             _totalAmount,
             _title,
             _desc
@@ -149,9 +155,17 @@ contract FibboCommunity is OwnableUpgradeable {
         suggestionFinished(_suggestionId)
         onlyOwner
     {
+        Suggestion memory suggestion = suggestions[_suggestionId];
+
+        address payable _proposer = suggestion.proposer;
+
         uint256 totalInSuggestion = suggestionsProgress[_suggestionId];
 
-        payable(msg.sender).transfer(totalInSuggestion);
+        uint256 feeAmount = (totalInSuggestion * proposerFee) / 10000;
+
+        _proposer.transfer(feeAmount);
+
+        payable(msg.sender).transfer(totalInSuggestion - feeAmount);
 
         withdrawedSuggestionsCount.increment();
 
@@ -180,11 +194,12 @@ contract FibboCommunity is OwnableUpgradeable {
 
         for (uint256 i = 0; i < suggestionsCount; i++) {
             Suggestion memory _sugg = suggestions[i + 1];
-            if (_sugg.creator != address(0)) {
+            if (_sugg.proposer != address(0)) {
                 uint256 _progress = suggestionsProgress[i + 1];
                 if (_sugg.totalAmount > _progress) {
                     result[currentIndex] = SuggestionInProgress(
                         i + 1,
+                        _sugg.proposer,
                         _sugg.title,
                         _sugg.description,
                         _sugg.totalAmount,

@@ -13,11 +13,16 @@ async function main(network) {
     ADDRESS_REGISTRY
   );
 
-  const marketAddress = await addressRegistry.marketplace();
-  const communityAddress = await addressRegistry.community();
+  const verificationAddress = await addressRegistry.verification();
 
-  console.log("Marketplace deployed at: ", marketAddress);
-  console.log("Community deployed at: ", communityAddress);
+  const verification = await ethers.getContractAt(
+    "FibboVerification",
+    verificationAddress
+  );
+
+  await verification.verificateAddress(
+    "0x06b3cC29D74a36f15F1B2beD529Fe45E30CAaf12"
+  );
 }
 
 main(network)
