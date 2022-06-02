@@ -16,9 +16,6 @@ const FibboMarkeplace = artifacts.require("FibboMarketplace");
 contract(
   "Verification Artist System",
   function ([owner, toVerificate, feeRecipient]) {
-    const firstTokenId = new BN("1");
-
-    const randomTokenURI = "ipfs";
     beforeEach(async function () {
       this.marketplace = await FibboMarkeplace.new(feeRecipient, 200, {
         from: owner,
@@ -64,6 +61,39 @@ contract(
         });
 
         await this.nft.createToken("ipfs", { from: toVerificate });
+      });
+    });
+
+    describe("Unverify address", function () {
+      it("reverts when we unverify and its not verified", async function () {
+        await expectRevert(
+          this.verification.unverifyAddress(toVerificate, {
+            from: owner,
+          }),
+          "This address is not verified!"
+        );
+      });
+
+      it("succesfully UnVerify address", async function () {
+        await this.verification.verificateAddress(toVerificate, {
+          from: owner,
+        });
+        await this.verification.unverifyAddress(toVerificate, {
+          from: owner,
+        });
+      });
+
+      it("reverts when we UnVerify address and we try to mint", async function () {
+        await this.verification.verificateAddress(toVerificate, {
+          from: owner,
+        });
+        await this.verification.unverifyAddress(toVerificate, {
+          from: owner,
+        });
+        await expectRevert(
+          this.nft.createToken("ipfs", { from: owner }),
+          "This address is not a verified artist!"
+        );
       });
     });
 
