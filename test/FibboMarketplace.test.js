@@ -36,6 +36,10 @@ contract(
         from: owner,
       });
 
+      this.marketplace.updateFibboVerification(this.verification.address, {
+        from: owner,
+      });
+
       this.verification.verificateAddress(owner, { from: owner });
       this.verification.verificateAddress(minter, { from: owner });
 

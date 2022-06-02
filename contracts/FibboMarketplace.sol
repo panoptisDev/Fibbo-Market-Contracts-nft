@@ -93,10 +93,8 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
         _;
     }
 
-     modifier isValidAddress(
-        address _address,
-    ) {
-        bool isValidAddress = fibboVerification.checkIfVerified(address);
+    modifier isVerifiedAddress(address _address) {
+        bool isValidAddress = fibboVerification.checkIfVerified(_address);
         require(isValidAddress, "Address is not verified");
         _;
     }
@@ -187,7 +185,7 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
         external
         nonReentrant
         isListed(_nftContract, _tokenId, msg.sender)
-        isValidAddress(msg.sender)
+        isVerifiedAddress(msg.sender)
     {
         _validOwner(_nftContract, _tokenId, msg.sender);
         delete (listings[_nftContract][_tokenId][msg.sender]);
@@ -201,7 +199,12 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
         address _nftContract,
         uint256 _tokenId,
         uint256 _newPrice
-    ) external nonReentrant  isListed(_nftContract, _tokenId, msg.sender) isValidAddress(msg.sender) {
+    )
+        external
+        nonReentrant
+        isListed(_nftContract, _tokenId, msg.sender)
+        isVerifiedAddress(msg.sender)
+    {
         listings[_nftContract][_tokenId][msg.sender] = _newPrice;
     }
 
