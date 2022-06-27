@@ -27,6 +27,9 @@ contract(
       this.nft.updateFibboVerification(this.verification.address, {
         from: owner,
       });
+      this.marketplace.updateFibboVerification(this.verification.address, {
+        from: owner,
+      });
     });
 
     describe("Verify address", function () {
@@ -48,6 +51,12 @@ contract(
         });
       });
 
+      it("succesfully verify address - inversor", async function () {
+        await this.verification.verificateInversor(toVerificate, {
+          from: owner,
+        });
+      });
+
       it("reverts when we try to mint with unverified address", async function () {
         await expectRevert(
           this.nft.createToken("ipfs", { from: toVerificate }),
@@ -61,6 +70,34 @@ contract(
         });
 
         await this.nft.createToken("ipfs", { from: toVerificate });
+      });
+
+      it("succesfully buys and sells item ", async function () {
+        await this.verification.verificateAddress(owner, {
+          from: owner,
+        });
+
+        await this.nft.createToken("ipfs", { from: owner });
+
+        await this.marketplace.listItem(this.nft.address, 1, 10, {
+          from: owner,
+        });
+
+        await this.marketplace.buyItem(this.nft.address, 1, owner, {
+          from: toVerificate,
+          value: 10,
+        });
+
+        await this.verification.verificateInversor(toVerificate, {
+          from: owner,
+        });
+
+        await this.nft.setApprovalForAll(this.marketplace.address, true, {
+          from: toVerificate,
+        });
+        await this.marketplace.listItem(this.nft.address, 1, 12, {
+          from: toVerificate,
+        });
       });
     });
 

@@ -12,7 +12,7 @@ const { expect } = require("chai");
 const FibboVerification = artifacts.require("FibboVerification");
 const FibboCommunity = artifacts.require("FibboCommunity");
 
-contract("Verification Artist System", function ([owner, proposer, depositor]) {
+contract("Community", function ([owner, proposer, depositor]) {
   const firstSuggestionId = new BN("1");
   const secondSuggestionId = new BN("2");
   const nonExistentSuggestionId = new BN("99");

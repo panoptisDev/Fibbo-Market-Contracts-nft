@@ -7,7 +7,8 @@ const { getConstants } = require("../constants");
 async function main(network) {
   console.log("Network is ", network.name);
 
-  const { PROXY_ADDRESS, ADDRESS_REGISTRY } = getConstants(network);
+  const { PROXY_ADDRESS, ADDRESS_REGISTRY, PLATFORM_FEE } =
+    getConstants(network);
 
   const proxyAdmin = await ethers.getContractAt("ProxyAdmin", PROXY_ADDRESS);
 

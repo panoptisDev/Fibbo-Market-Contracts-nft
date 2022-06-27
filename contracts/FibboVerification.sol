@@ -7,10 +7,18 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 contract FibboVerification is Ownable {
     mapping(address => bool) verifiedArtists;
 
+    mapping(address => bool) verifiedInversors;
+
     /// @notice Contract initializer
     constructor() {}
 
     modifier isNotVerified(address _address) {
+        bool verified = verifiedArtists[_address];
+        require(!verified, "This address is already verified!");
+        _;
+    }
+
+    modifier isNotVerifiedInversor(address _address) {
         bool verified = verifiedArtists[_address];
         require(!verified, "This address is already verified!");
         _;
@@ -30,8 +38,24 @@ contract FibboVerification is Ownable {
         verifiedArtists[_toVerificate] = true;
     }
 
+    function verificateInversor(address _toVerificate)
+        external
+        isNotVerifiedInversor(_toVerificate)
+        onlyOwner
+    {
+        verifiedArtists[_toVerificate] = true;
+    }
+
     function checkIfVerified(address _address) public view returns (bool) {
         return verifiedArtists[_address];
+    }
+
+    function checkIfVerifiedInversor(address _address)
+        public
+        view
+        returns (bool)
+    {
+        return verifiedInversors[_address];
     }
 
     function unverifyAddress(address _toVerificate)

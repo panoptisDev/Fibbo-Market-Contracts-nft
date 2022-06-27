@@ -18,6 +18,8 @@ interface IFibboAddressRegistry {
 
 interface IFibboVerification {
     function checkIfVerified(address) external view returns (bool);
+
+    function checkIfVerifiedInversor(address) external view returns (bool);
 }
 
 contract FibboMarketplace is Ownable, ReentrancyGuard {
@@ -95,7 +97,13 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
 
     modifier isVerifiedAddress(address _address) {
         bool isValidAddress = fibboVerification.checkIfVerified(_address);
-        require(isValidAddress, "Address is not verified");
+        if (!isValidAddress) {
+            bool isValidInversor = fibboVerification.checkIfVerifiedInversor(
+                _address
+            );
+            require(isValidInversor, "Address is not verified");
+        }
+
         _;
     }
 
@@ -247,7 +255,6 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
             );
         }
 
-        emit ItemSold(_owner, msg.sender, _nftContract, _tokenId, price);
         delete (listings[_nftContract][_tokenId][_owner]);
     }
 

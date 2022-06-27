@@ -160,24 +160,25 @@ contract FibboCommunity is Ownable {
     function withdrawFromSuggestion(
         uint256 _suggestionId,
         uint256 _finishedSuggestionId
-    )
-        external
-        payable
-        suggestionExists(_suggestionId)
-        suggestionFinished(_suggestionId)
-        onlyOwner
-    {
+    ) external payable suggestionExists(_suggestionId) onlyOwner {
         Suggestion memory suggestion = suggestions[_suggestionId];
 
         address payable _proposer = suggestion.proposer;
 
         uint256 totalInSuggestion = suggestionsProgress[_suggestionId];
 
-        uint256 feeAmount = (totalInSuggestion * proposerFee) / 10000;
+        // Comprobar si ha llegado a mas del 50%
+        uint256 halfAmount = suggestion.totalAmount / 2;
 
-        _proposer.transfer(feeAmount);
+        if (totalInSuggestion >= halfAmount) {
+            uint256 feeAmount = (totalInSuggestion * proposerFee) / 10000;
 
-        payable(msg.sender).transfer(totalInSuggestion - feeAmount);
+            _proposer.transfer(feeAmount);
+
+            payable(msg.sender).transfer(totalInSuggestion - feeAmount);
+        } else {
+            payable(msg.sender).transfer(totalInSuggestion);
+        }
 
         withdrawedSuggestionsCount.increment();
 
