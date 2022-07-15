@@ -15,11 +15,17 @@ contract FibboAddressRegistry is OwnableUpgradeable {
     /// @notice FibboMarketplace contract
     address public marketplace;
 
+    /// @notice FibboAuction contract
+    address public auction;
+
     /// @notice FibboMarketplace contract
     address public community;
 
     /// @notice FibboMarketplace contract
     address public verification;
+
+    /// @notice FibboTokenRegistry contract
+    address public tokenRegistry;
 
     /// @notice Contract initializer
     function initialize() public initializer {
@@ -47,6 +53,22 @@ contract FibboAddressRegistry is OwnableUpgradeable {
      */
     function updateMarketplace(address _marketplace) external onlyOwner {
         marketplace = _marketplace;
+    }
+
+    /**
+     @notice Update FibboAuction contract
+     @dev Only admin
+     */
+    function updateAuction(address _auction) external onlyOwner {
+        auction = _auction;
+    }
+
+    /**
+     @notice Update FibboTokenRegistry contract
+     @dev Only admin
+     */
+    function updateTokenRegistry(address _tokenRegistry) external onlyOwner {
+        tokenRegistry = _tokenRegistry;
     }
 
     /**

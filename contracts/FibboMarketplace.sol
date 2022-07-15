@@ -1,12 +1,38 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.6;
 
-import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+
+interface IFibboTokenRegistry {
+    function enabled(address) external view returns (bool);
+}
+
+interface IFibboPriceFeed {
+    function wFTM() external view returns (address);
+
+    function getPrice(address) external view returns (int256, uint8);
+}
+
+interface IFibboAuction {
+    function auctions(address, uint256)
+        external
+        view
+        returns (
+            address,
+            address,
+            uint256,
+            uint256,
+            uint256,
+            bool
+        );
+}
 
 interface IFibboAddressRegistry {
     function fibboCollection() external view returns (address);
@@ -14,6 +40,10 @@ interface IFibboAddressRegistry {
     function marketplace() external view returns (address);
 
     function community() external view returns (address);
+
+    function auction() external view returns (address);
+
+    function tokenRegistry() external view returns (address);
 }
 
 interface IFibboVerification {
@@ -24,25 +54,45 @@ interface IFibboVerification {
 
 contract FibboMarketplace is Ownable, ReentrancyGuard {
     //using AddressUpgradeable for address payable;
+    using SafeERC20 for IERC20;
+
+    /// @notice Structure for listed items
 
     event ItemListed(
         address indexed owner,
         address indexed nft,
         uint256 tokenId,
-        uint256 price
+        address payToken,
+        uint256 price,
+        uint256 startingTime
     );
     event ItemSold(
         address indexed seller,
         address indexed buyer,
         address indexed nft,
         uint256 tokenId,
+        address payToken,
         uint256 price
+    );
+    event ItemUpdated(
+        address indexed owner,
+        address indexed nft,
+        uint256 tokenId,
+        address payToken,
+        uint256 newPrice
+    );
+    event ItemCanceled(
+        address indexed owner,
+        address indexed nft,
+        uint256 tokenId
     );
     event OfferCreated(
         address indexed creator,
         address indexed nft,
         uint256 tokenId,
-        uint256 price
+        address payToken,
+        uint256 price,
+        uint256 deadline
     );
     event OfferCanceled(
         address indexed creator,
@@ -50,10 +100,23 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
         uint256 tokenId
     );
 
-    IFibboVerification fibboVerification;
-
     event UpdatePlatformFee(uint16 platformFee);
     event UpdatePlatformFeeRecipient(address payable platformFeeRecipient);
+
+    struct Listing {
+        address payToken;
+        uint256 price;
+        uint256 startingTime;
+    }
+
+    /// @notice Structure for offer
+    struct Offer {
+        IERC20 payToken;
+        uint256 price;
+        uint256 deadline;
+    }
+
+    IFibboVerification fibboVerification;
 
     bytes4 private constant INTERFACE_ID_ERC721 = 0x80ac58cd;
     bytes4 private constant INTERFACE_ID_ERC1155 = 0xd9b67a26;
@@ -72,11 +135,11 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
     mapping(address => mapping(uint256 => uint16)) public royalties;
 
     /// @notice NftAddress -> Token ID -> Owner -> Listing item
-    mapping(address => mapping(uint256 => mapping(address => uint256)))
+    mapping(address => mapping(uint256 => mapping(address => Listing)))
         public listings;
 
     /// @notice NftAddress -> Token ID -> Offerer -> Offer
-    mapping(address => mapping(uint256 => mapping(address => uint256)))
+    mapping(address => mapping(uint256 => mapping(address => Offer)))
         public offers;
 
     /// @notice Contract initializer
@@ -90,8 +153,8 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
         uint256 _tokenId,
         address _owner
     ) {
-        uint256 listing = listings[_nftContract][_tokenId][_owner];
-        require(listing > 0, "not listed item");
+        Listing memory listing = listings[_nftContract][_tokenId][_owner];
+        require(listing.price > 0, "not listed item");
         _;
     }
 
@@ -107,13 +170,26 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
         _;
     }
 
+    modifier validListing(
+        address _nftContract,
+        uint256 _tokenId,
+        address _owner
+    ) {
+        Listing memory listedItem = listings[_nftContract][_tokenId][_owner];
+
+        _validOwner(_nftContract, _tokenId, _owner);
+
+        require(_getNow() >= listedItem.startingTime, "item not buyable");
+        _;
+    }
+
     modifier notListed(
         address _nftContract,
         uint256 _tokenId,
         address _owner
     ) {
-        uint256 listing = listings[_nftContract][_tokenId][_owner];
-        require(listing == 0, "already listed");
+        Listing memory listing = listings[_nftContract][_tokenId][_owner];
+        require(listing.price == 0, "already listed");
         _;
     }
 
@@ -122,8 +198,8 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
         uint256 _tokenId,
         address _creator
     ) {
-        uint256 offer = offers[_nftContract][_tokenId][_creator];
-        require(offer > 0, "offer not exists or expired");
+        Offer memory offer = offers[_nftContract][_tokenId][_creator];
+        require(offer.deadline > _getNow(), "offer not exists or expired");
         _;
     }
 
@@ -132,24 +208,31 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
         uint256 _tokenId,
         address _creator
     ) {
-        uint256 offer = offers[_nftContract][_tokenId][_creator];
-        require(offer == 0, "offer already created");
+        Offer memory offer = offers[_nftContract][_tokenId][_creator];
+        require(
+            offer.price == 0 || offer.deadline <= _getNow(),
+            "offer already created"
+        );
         _;
     }
 
-    function _validOwner(
-        address _nftContract,
-        uint256 _tokenId,
-        address _owner
-    ) internal {
-        if (IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC721)) {
-            IERC721 nft = IERC721(_nftContract);
-            require(nft.ownerOf(_tokenId) == _owner, "not owning item");
-        } else {
-            revert("invalid nft address");
-        }
-    }
+    /// @notice Contract initializer
+    // function initialize(address payable _feeRecipient, uint16 _platformFee)
+    //     public
+    //     initializer
+    // {
+    //     platformFee = _platformFee;
+    //     feeReceipient = _feeRecipient;
 
+    //     __Ownable_init();
+    //     __ReentrancyGuard_init();
+    // }
+
+    /// @notice Method for registering royalties
+    /// @param _minter Token ID of NFT
+    /// @param _nftContract Address of NFT contract
+    /// @param _tokenId Token ID of NFT
+    /// @param _royalty Royaltie percentatge
     function registerRoyalty(
         address _minter,
         address _nftContract,
@@ -160,10 +243,18 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
         royalties[_nftContract][_tokenId] = _royalty;
     }
 
+    /// @notice Method for listing NFT
+    /// @param _nftContract Address of NFT contract
+    /// @param _tokenId Token ID of NFT
+    /// @param _payToken Paying token
+    /// @param _price sale price
+    /// @param _startingTime scheduling for a future sale
     function listItem(
         address _nftContract,
         uint256 _tokenId,
-        uint256 _price
+        address _payToken,
+        uint256 _price,
+        uint256 _startingTime
     )
         external
         isVerifiedAddress(msg.sender)
@@ -183,9 +274,22 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
             revert("Invalid nft contract!");
         }
 
-        listings[_nftContract][_tokenId][msg.sender] = _price;
+        _validPayToken(_payToken);
 
-        emit ItemListed(msg.sender, _nftContract, _tokenId, _price);
+        listings[_nftContract][_tokenId][msg.sender] = Listing(
+            _payToken,
+            _price,
+            _startingTime
+        );
+
+        emit ItemListed(
+            msg.sender,
+            _nftContract,
+            _tokenId,
+            _payToken,
+            _price,
+            _startingTime
+        );
     }
 
     /// @notice Method for canceling listed NFT
@@ -195,17 +299,18 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
         isListed(_nftContract, _tokenId, msg.sender)
         isVerifiedAddress(msg.sender)
     {
-        _validOwner(_nftContract, _tokenId, msg.sender);
-        delete (listings[_nftContract][_tokenId][msg.sender]);
+        _cancelListing(_nftContract, _tokenId, msg.sender);
     }
 
     /// @notice Method for updating listed NFT
     /// @param _nftContract Address of NFT contract
     /// @param _tokenId Token ID of NFT
-    /// @param _newPrice New sale price for each iteam
+    /// @param _payToken Paying token
+    /// @param _newPrice New sale price
     function updateListing(
         address _nftContract,
         uint256 _tokenId,
+        address _payToken,
         uint256 _newPrice
     )
         external
@@ -213,22 +318,50 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
         isListed(_nftContract, _tokenId, msg.sender)
         isVerifiedAddress(msg.sender)
     {
-        listings[_nftContract][_tokenId][msg.sender] = _newPrice;
+        Listing storage listedItem = listings[_nftContract][_tokenId][
+            msg.sender
+        ];
+
+        _validOwner(_nftContract, _tokenId, msg.sender);
+
+        _validPayToken(_payToken);
+
+        listedItem.payToken = _payToken;
+        listedItem.price = _newPrice;
+        emit ItemUpdated(
+            msg.sender,
+            _nftContract,
+            _tokenId,
+            _payToken,
+            _newPrice
+        );
     }
+
+    /// @notice Method for buying listed NFT
+    /// @param _nftContract NFT contract address
+    /// @param _tokenId TokenId
+    /// @param _payToken Paying token
+    /// @param _owner Current Nft owner
 
     function buyItem(
         address _nftContract,
         uint256 _tokenId,
+        address _payToken,
         address payable _owner
     ) external payable nonReentrant isListed(_nftContract, _tokenId, _owner) {
-        uint256 price = listings[_nftContract][_tokenId][_owner];
+        Listing memory listedItem = listings[_nftContract][_tokenId][_owner];
+
+        uint256 price = listedItem.price;
 
         require(msg.value >= price, "Not enough to buy item");
 
         uint256 feeAmount = (price * platformFee) / 10000;
 
-        bool sentFee = feeReceipient.send(feeAmount);
-        require(sentFee, "Transfer of ETH failed, fee payment");
+        IERC20(_payToken).safeTransferFrom(
+            msg.sender,
+            feeReceipient,
+            feeAmount
+        );
 
         address minter = minters[_nftContract][_tokenId];
         uint16 royalty = royalties[_nftContract][_tokenId];
@@ -236,15 +369,16 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
         if (minter != address(0) && royalty != 0) {
             uint256 royaltyFee = ((price - feeAmount) * royalty) / 10000;
 
-            bool royaltySend = payable(minter).send(royaltyFee);
-            require(royaltySend, "Transfer of ETH failed, royalty payment");
+            IERC20(_payToken).safeTransferFrom(msg.sender, minter, royaltyFee);
 
             feeAmount = feeAmount + royaltyFee;
         }
 
-        bool sent = _owner.send(price - feeAmount);
-        require(sent, "Transfer of FTM failed!");
-
+        IERC20(_payToken).safeTransferFrom(
+            msg.sender,
+            _owner,
+            price - feeAmount
+        );
         // Transfer NFT to buyer
 
         if (IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC721)) {
@@ -255,7 +389,135 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
             );
         }
 
+        emit ItemSold(
+            _owner,
+            msg.sender,
+            _nftContract,
+            _tokenId,
+            _payToken,
+            price
+        );
+
         delete (listings[_nftContract][_tokenId][_owner]);
+    }
+
+    /// @notice Method for offering item
+    /// @param _nftContract NFT contract address
+    /// @param _tokenId TokenId
+    /// @param _payToken Paying token
+    /// @param _price price
+    function createOffer(
+        address _nftContract,
+        uint256 _tokenId,
+        IERC20 _payToken,
+        uint256 _price,
+        uint256 _deadline
+    ) external offerNotExists(_nftContract, _tokenId, msg.sender) {
+        require(
+            IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC721) ||
+                IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC1155),
+            "invalid nft address"
+        );
+
+        IFibboAuction auction = IFibboAuction(addressRegistry.auction());
+
+        (, , , uint256 startTime, , bool resulted) = auction.auctions(
+            _nftContract,
+            _tokenId
+        );
+
+        require(
+            startTime == 0 || resulted == true,
+            "cannot place an offer if auction is going on"
+        );
+
+        require(_deadline > _getNow(), "invalid expiration");
+
+        _validPayToken(address(_payToken));
+
+        offers[_nftContract][_tokenId][msg.sender] = Offer(
+            _payToken,
+            _price,
+            _deadline
+        );
+
+        emit OfferCreated(
+            msg.sender,
+            _nftContract,
+            _tokenId,
+            address(_payToken),
+            _price,
+            _deadline
+        );
+    }
+
+    /// @notice Method for canceling the offer
+    /// @param _nftContract NFT contract address
+    /// @param _tokenId TokenId
+    function cancelOffer(address _nftContract, uint256 _tokenId)
+        external
+        offerExists(_nftContract, _tokenId, msg.sender)
+    {
+        delete (offers[_nftContract][_tokenId][msg.sender]);
+        emit OfferCanceled(msg.sender, _nftContract, _tokenId);
+    }
+
+    /// @notice Method for accepting the offer
+    /// @param _nftContract NFT contract address
+    /// @param _tokenId TokenId
+    /// @param _creator Offer creator address
+    function acceptOffer(
+        address _nftContract,
+        uint256 _tokenId,
+        address _creator
+    ) external nonReentrant offerExists(_nftContract, _tokenId, _creator) {
+        Offer memory offer = offers[_nftContract][_tokenId][_creator];
+
+        _validOwner(_nftContract, _tokenId, msg.sender);
+
+        uint256 price = offer.price;
+
+        uint256 feeAmount = (price * platformFee) / 10000;
+
+        offer.payToken.safeTransferFrom(_creator, feeReceipient, feeAmount);
+
+        address minter = minters[_nftContract][_tokenId];
+        uint16 royalty = royalties[_nftContract][_tokenId];
+
+        if (minter != address(0) && royalty != 0) {
+            uint256 royaltyFee = ((price - feeAmount) * royalty) / 10000;
+            offer.payToken.safeTransferFrom(_creator, minter, royaltyFee);
+            feeAmount = feeAmount + royaltyFee;
+        }
+
+        offer.payToken.safeTransferFrom(
+            _creator,
+            msg.sender,
+            price - feeAmount
+        );
+
+        // Transfer NFT to buyer
+        if (IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC721)) {
+            IERC721(_nftContract).safeTransferFrom(
+                msg.sender,
+                _creator,
+                _tokenId
+            );
+        }
+
+        emit ItemSold(
+            msg.sender,
+            _creator,
+            _nftContract,
+            _tokenId,
+            address(offer.payToken),
+            offer.price
+        );
+
+        emit OfferCanceled(_creator, _nftContract, _tokenId);
+
+        delete (listings[_nftContract][_tokenId][msg.sender]);
+        delete (offers[_nftContract][_tokenId][_creator]);
     }
 
     /**
@@ -291,5 +553,49 @@ contract FibboMarketplace is Ownable, ReentrancyGuard {
 
     function updateFibboVerification(address _verification) external onlyOwner {
         fibboVerification = IFibboVerification(_verification);
+    }
+
+    ////////////////////////////
+    /// Internal and Private ///
+    ////////////////////////////
+
+    function _getNow() internal view virtual returns (uint256) {
+        return block.timestamp;
+    }
+
+    function _validPayToken(address _payToken) internal {
+        require(
+            _payToken == address(0) ||
+                (addressRegistry.tokenRegistry() != address(0) &&
+                    IFibboTokenRegistry(addressRegistry.tokenRegistry())
+                        .enabled(_payToken)),
+            "invalid pay token"
+        );
+    }
+
+    function _validOwner(
+        address _nftContract,
+        uint256 _tokenId,
+        address _owner
+    ) internal {
+        if (IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC721)) {
+            IERC721 nft = IERC721(_nftContract);
+            require(nft.ownerOf(_tokenId) == _owner, "not owning item");
+        } else {
+            revert("invalid nft address");
+        }
+    }
+
+    function _cancelListing(
+        address _nftContract,
+        uint256 _tokenId,
+        address _owner
+    ) private {
+        Listing memory listedItem = listings[_nftContract][_tokenId][_owner];
+
+        _validOwner(_nftContract, _tokenId, _owner);
+
+        delete (listings[_nftContract][_tokenId][_owner]);
+        emit ItemCanceled(_owner, _nftContract, _tokenId);
     }
 }
