@@ -2,6 +2,9 @@
 // run: npx hardhat node on a terminal
 // then run: npx hardhat run --network localhost scripts/12_deploy_all.js
 
+const WRAPPED_FTM_MAINNET = "0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83";
+const WRAPPED_FTM_TESTNET = "0xf1277d1ed8ad466beddf92ef448a132661956621";
+
 const { getConstants } = require("./constants");
 
 async function main(network) {
@@ -53,6 +56,38 @@ async function main(network) {
   console.log("Marketplace Proxy Initialized");
   ////
 
+  //// Marketplace deployement
+  const Auction = await ethers.getContractFactory("FibboAuction");
+  const auctionIml = await Auction.deploy();
+  await auctionIml.deployed();
+
+  console.log("FibboMarkeplace deployed to: ", auctionIml.address);
+
+  const auctionProxy = await AdminUpgradeabilityProxy.deploy(
+    auctionIml.address,
+    PROXY_ADDRESS,
+    []
+  );
+  await auctionProxy.deployed();
+
+  console.log("Auction Proxy deployed at: ", auctionProxy.address);
+  const AUCTION_ADDRESS = auctionProxy.address;
+
+  const auction = await ethers.getContractAt("FibboAuction", AUCTION_ADDRESS);
+
+  await auction.initialize(TREASURY_ADDRESS, PLATFORM_FEE);
+  console.log("Auction Proxy Initialized");
+  ////
+
+  //// TokenRegistry Deployement
+  const TokenRegistry = await ethers.getContractFactory("FibboTokenRegistry");
+  const tokenRegistry = await TokenRegistry.deploy();
+
+  await tokenRegistry.deployed();
+
+  console.log("TokenRegistry deployed to", tokenRegistry.address);
+  ////
+
   //// Community deployement
   const Community = await ethers.getContractFactory("FibboCommunity");
   const comunityImpl = await Community.deploy();
@@ -67,7 +102,7 @@ async function main(network) {
   );
   await communityProxy.deployed();
 
-  console.log("Community Proxy deployed at: ", comunityImpl.address);
+  console.log("Community Proxy deployed at: ", communityProxy.address);
   const COMMUNITY_ADDRESS = communityProxy.address;
 
   const community = await ethers.getContractAt(
@@ -95,7 +130,7 @@ async function main(network) {
   );
   await verificationProxy.deployed();
 
-  console.log("Community Proxy deployed at: ", comunityImpl.address);
+  console.log("Verification Proxy deployed at: ", verificationProxy.address);
   const VERIFICATION_ADDRESS = verificationProxy.address;
 
   const verification = await ethers.getContractAt(
@@ -147,12 +182,19 @@ async function main(network) {
   console.log("AddressRegistry proxy initalized");
 
   await defaultCollection.updateFibboVerification(VERIFICATION_ADDRESS);
+  await marketplace.updateFibboVerification(VERIFICATION_ADDRESS);
+
   await marketplace.updateAddressRegistry(ADDRESS_REGISTRY);
+  await auction.updateAddressRegistry(ADDRESS_REGISTRY);
 
   await addressRegistry.updateFibboCollection(defaultCollection.address);
   await addressRegistry.updateMarketplace(marketplace.address);
+  await addressRegistry.updateAuction(auction.address);
   await addressRegistry.updateCommunity(community.address);
   await addressRegistry.updateVerification(verification.address);
+  await addressRegistry.updateTokenRegistry(tokenRegistry.address);
+
+  await tokenRegistry.add(WRAPPED_FTM_TESTNET);
 
   console.log("AddressRegistry has been filled");
   ////

@@ -10,7 +10,7 @@ interface IFibboVerification {
     function checkIfVerified(address) external view returns (bool);
 }
 
-contract FibboCommunity is Ownable {
+contract FibboCommunity is OwnableUpgradeable {
     using Counters for Counters.Counter;
     Counters.Counter public suggestionsIds;
     Counters.Counter public finishedSuggestionsCount;
@@ -65,8 +65,10 @@ contract FibboCommunity is Ownable {
     event SuggestionCompleted(uint256 suggestionId, Suggestion suggestion);
 
     /// @notice Contract initializer
-    constructor(uint16 _proposerFee) {
+    function initialize(uint16 _proposerFee) public initializer {
         proposerFee = _proposerFee;
+
+        __Ownable_init();
     }
 
     modifier suggestionExists(uint256 _suggestionId) {

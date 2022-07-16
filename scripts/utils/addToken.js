@@ -2,7 +2,7 @@
 // PROXY -> 0xa513E6E4b8f2a923D98304ec87F64353C4D5C853
 
 const { getConstants } = require("../constants");
-
+const WRAPPED_FTM_TESTNET = "0xf1277d1ed8ad466beddf92ef448a132661956621";
 async function main(network) {
   console.log("Network is ", network.name);
 
@@ -13,16 +13,14 @@ async function main(network) {
     ADDRESS_REGISTRY
   );
 
-  const verificationAddress = await addressRegistry.verification();
+  const tokenRegistryAddress = await addressRegistry.tokenRegistry();
 
-  const verification = await ethers.getContractAt(
-    "FibboVerification",
-    verificationAddress
+  const tokenRegistry = await ethers.getContractAt(
+    "FibboTokenRegistry",
+    tokenRegistryAddress
   );
 
-  await verification.verificateAddress(
-    "0x1d92D9a839e9c5D8cc02A7F87E591fF1AdA33268"
-  );
+  await tokenRegistry.add(WRAPPED_FTM_TESTNET);
 }
 
 main(network)

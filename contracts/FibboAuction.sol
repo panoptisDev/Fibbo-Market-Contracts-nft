@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -31,7 +32,7 @@ interface IFibboTokenRegistry {
 /**
  * @notice Secondary sale auction contract for NFTs
  */
-contract FibboAuction is Ownable, ReentrancyGuard {
+contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using AddressUpgradeable for address payable;
     using SafeERC20 for IERC20;
 
@@ -132,7 +133,7 @@ contract FibboAuction is Ownable, ReentrancyGuard {
     uint256 public bidWithdrawalLockTime = 20 minutes;
 
     /// @notice global platform fee, assumed to always be to 1 decimal place i.e. 25 = 2.5%
-    uint256 public platformFee = 25;
+    uint16 public platformFee;
 
     /// @notice where to send platform fee funds to
     address payable public platformFeeRecipient;
@@ -157,13 +158,20 @@ contract FibboAuction is Ownable, ReentrancyGuard {
     }
 
     /// @notice Contract initializer
-    constructor(address payable _platformFeeRecipient) {
+    function initialize(
+        address payable _platformFeeRecipient,
+        uint16 _platformFee
+    ) public initializer {
         require(
             _platformFeeRecipient != address(0),
             "Invalid Platform Fee Recipient"
         );
 
         platformFeeRecipient = _platformFeeRecipient;
+        platformFee = _platformFee;
+
+        __Ownable_init();
+        __ReentrancyGuard_init();
     }
 
     /**
