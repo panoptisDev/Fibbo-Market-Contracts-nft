@@ -13,15 +13,12 @@ async function main(network) {
     ADDRESS_REGISTRY
   );
 
-  const verificationAddress = await addressRegistry.verification();
+  const marketplaceAddress = await addressRegistry.marketplace();
 
-  const verification = await ethers.getContractAt(
-    "FibboVerification",
-    verificationAddress
-  );
-
-  await verification.verificateAddress(
-    "0x8a68B243B97C8F7E81C347418F48775D7890d0fa"
+  const collection = await addressRegistry.fibboCollection();
+  const marketplace = await ethers.getContractAt(
+    "FibboMarketplace",
+    marketplaceAddress
   );
 }
 

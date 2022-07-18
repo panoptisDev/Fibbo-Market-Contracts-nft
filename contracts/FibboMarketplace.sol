@@ -4,11 +4,9 @@ pragma solidity ^0.8.6;
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface IFibboTokenRegistry {
     function enabled(address) external view returns (bool);
@@ -116,8 +114,6 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         uint256 deadline;
     }
 
-    IFibboVerification fibboVerification;
-
     bytes4 private constant INTERFACE_ID_ERC721 = 0x80ac58cd;
     bytes4 private constant INTERFACE_ID_ERC1155 = 0xd9b67a26;
 
@@ -129,6 +125,8 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
     /// @notice Address registry
     IFibboAddressRegistry public addressRegistry;
+
+    IFibboVerification fibboVerification;
 
     mapping(address => mapping(uint256 => address)) public minters;
 
@@ -222,18 +220,6 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         _;
     }
 
-    /// @notice Contract initializer
-    // function initialize(address payable _feeRecipient, uint16 _platformFee)
-    //     public
-    //     initializer
-    // {
-    //     platformFee = _platformFee;
-    //     feeReceipient = _feeRecipient;
-
-    //     __Ownable_init();
-    //     __ReentrancyGuard_init();
-    // }
-
     /// @notice Method for registering royalties
     /// @param _minter Token ID of NFT
     /// @param _nftContract Address of NFT contract
@@ -250,11 +236,6 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     /// @notice Method for listing NFT
-    /// @param _nftContract Address of NFT contract
-    /// @param _tokenId Token ID of NFT
-    /// @param _payToken Paying token
-    /// @param _price sale price
-    /// @param _startingTime scheduling for a future sale
     function listItem(
         address _nftContract,
         uint256 _tokenId,
@@ -358,8 +339,6 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         Listing memory listedItem = listings[_nftContract][_tokenId][_owner];
 
         uint256 price = listedItem.price;
-
-        require(msg.value >= price, "Not enough to buy item");
 
         uint256 feeAmount = (price * platformFee) / 10000;
 
@@ -466,6 +445,18 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     {
         delete (offers[_nftContract][_tokenId][msg.sender]);
         emit OfferCanceled(msg.sender, _nftContract, _tokenId);
+    }
+
+    /// @notice Method for canceling all the non acceptedOffers
+    /// @param _nftContract NFT contract address
+    /// @param _tokenId TokenId
+    function cleanOffers(
+        address _nftContract,
+        uint256 _tokenId,
+        address _creator
+    ) external offerExists(_nftContract, _tokenId, _creator) onlyOwner {
+        delete (offers[_nftContract][_tokenId][_creator]);
+        emit OfferCanceled(_creator, _nftContract, _tokenId);
     }
 
     /// @notice Method for accepting the offer

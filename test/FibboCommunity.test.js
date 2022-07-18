@@ -12,7 +12,7 @@ const { expect } = require("chai");
 const FibboVerification = artifacts.require("FibboVerification");
 const FibboCommunity = artifacts.require("FibboCommunity");
 
-contract("Community", function ([owner, proposer, depositor]) {
+/* contract("Community", function ([owner, proposer, depositor]) {
   const firstSuggestionId = new BN("1");
   const secondSuggestionId = new BN("2");
   const nonExistentSuggestionId = new BN("99");
@@ -262,4 +262,4 @@ contract("Community", function ([owner, proposer, depositor]) {
     const gasPrice = new BN(tx.gasPrice);
     return gasPrice.mul(new BN(receipt.receipt.gasUsed));
   }
-});
+}); */

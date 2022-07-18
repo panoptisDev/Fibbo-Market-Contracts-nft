@@ -13,7 +13,7 @@ const FibboNFT = artifacts.require("DefaultFibbo");
 const FibboVerification = artifacts.require("FibboVerification");
 const FibboMarkeplace = artifacts.require("FibboMarketplace");
 
-contract(
+/* contract(
   "Verification Artist System",
   function ([owner, toVerificate, feeRecipient]) {
     beforeEach(async function () {
@@ -140,4 +140,4 @@ contract(
       return gasPrice.mul(new BN(receipt.receipt.gasUsed));
     }
   }
-);
+); */

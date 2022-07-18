@@ -58,7 +58,9 @@ contract(
           this.marketplace.listItem(
             this.nft.address,
             nonExistentTokenId,
+            ZERO_ADDRESS,
             price,
+            0,
             {
               from: minter,
             }
@@ -69,32 +71,61 @@ contract(
 
       it("reverts when not owning NFT", async function () {
         await expectRevert(
-          this.marketplace.listItem(this.nft.address, firstTokenId, price, {
-            from: owner,
-          }),
+          this.marketplace.listItem(
+            this.nft.address,
+            firstTokenId,
+            ZERO_ADDRESS,
+            price,
+            0,
+            {
+              from: owner,
+            }
+          ),
           "Sender don't own item!"
         );
       });
 
       it("reverts when is already listed", async function () {
-        await this.marketplace.listItem(this.nft.address, firstTokenId, price, {
-          from: minter,
-        });
-        await expectRevert(
-          this.marketplace.listItem(this.nft.address, firstTokenId, price, {
+        await this.marketplace.listItem(
+          this.nft.address,
+          firstTokenId,
+          ZERO_ADDRESS,
+          price,
+          0,
+          {
             from: minter,
-          }),
+          }
+        );
+        await expectRevert(
+          this.marketplace.listItem(
+            this.nft.address,
+            firstTokenId,
+            ZERO_ADDRESS,
+            price,
+            0,
+            {
+              from: minter,
+            }
+          ),
           "already listed"
         );
       });
 
       it("successfuly lists item", async function () {
-        await this.marketplace.listItem(this.nft.address, firstTokenId, price, {
-          from: minter,
-        });
+        await this.marketplace.listItem(
+          this.nft.address,
+          firstTokenId,
+          ZERO_ADDRESS,
+          price,
+          0,
+          {
+            from: minter,
+          }
+        );
       });
     });
 
+    /* 
     describe("Canceling Item", function () {
       this.beforeEach(async function () {
         await this.marketplace.listItem(this.nft.address, firstTokenId, price, {
@@ -220,7 +251,7 @@ contract(
           "9.8"
         );
       });
-    });
+    }); */
 
     async function getGasCosts(receipt) {
       const tx = await web3.eth.getTransaction(receipt.tx);
