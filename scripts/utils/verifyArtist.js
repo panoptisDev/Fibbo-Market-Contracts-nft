@@ -21,7 +21,19 @@ async function main(network) {
   );
 
   await verification.verificateAddress(
+    "0x1d92D9a839e9c5D8cc02A7F87E591fF1AdA33268"
+  );
+
+  await verification.verificateAddress(
+    "0x06b3cC29D74a36f15F1B2beD529Fe45E30CAaf12"
+  );
+
+  await verification.verificateAddress(
     "0x8a68B243B97C8F7E81C347418F48775D7890d0fa"
+  );
+
+  await verification.verificateAddress(
+    "0x1d92D9a839e9c5D8cc02A7F87E591fF1AdA33268"
   );
 }
 

@@ -13,7 +13,7 @@ async function main(network) {
     ADDRESS_REGISTRY
   );
 
-  const marketAddress = await addressRegistry.marketplace();
+  const marketAddress = await addressRegistry.auction();
   const communityAddress = await addressRegistry.community();
 
   console.log("Marketplace deployed at: ", marketAddress);
