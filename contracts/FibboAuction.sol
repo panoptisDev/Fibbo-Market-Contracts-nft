@@ -615,6 +615,40 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     /**
+     @notice Closes a finished auction that has not been completed
+     @param _nftContract ERC 721 Address
+     @param _tokenId Token ID of the item being auctioned
+     */
+    function clearAuction(address _nftContract, uint256 _tokenId)
+        external
+        onlyOwner
+    {
+        Auction memory auction = auctions[_nftContract][_tokenId];
+
+        address auctionOwner = auction.owner;
+
+        // Check the auction real
+        require(auction.endTime > 0, "no auction exists");
+
+        // Check the auction has ended
+        require(_getNow() > auction.endTime, "auction not ended");
+
+        // Ensure auction not already resulted
+        require(!auction.resulted, "auction already resulted");
+
+        // Ensure this contract is approved to move the token
+        require(
+            IERC721(_nftContract).isApprovedForAll(owner(), address(this)),
+            "auction not approved"
+        );
+
+        // Result the auction
+        auction.resulted = true;
+
+        _cancelAuction(_nftContract, _tokenId);
+    }
+
+    /**
      @notice Cancels and inflight and un-resulted auctions, returning the funds to the top bidder if found
      @dev Only item owner
      @param _nftContract ERC 721 Address
@@ -799,6 +833,7 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
             address _owner,
             address _payToken,
             uint256 _reservePrice,
+            uint256 _buyNowPrice,
             uint256 _startTime,
             uint256 _endTime,
             bool _resulted,
@@ -810,6 +845,7 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
             auction.owner,
             auction.payToken,
             auction.reservePrice,
+            auction.buyNowPrice,
             auction.startTime,
             auction.endTime,
             auction.resulted,
