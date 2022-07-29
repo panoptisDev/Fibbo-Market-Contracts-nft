@@ -6,7 +6,8 @@
   "scripts": {
     "deploy-local": "npx hardhat run --network localhost scripts/deploy_all.js",
     "deploy-testnet": "npx hardhat run --network testnet scripts/deploy_all.js",
-    "deploy-mainnet": "npx hardhat run --network mainnet scripts/deploy_all.js"
+    "deploy-mainnet": "npx hardhat run --network mainnet scripts/deploy_all.js",
+    "migrate-testnet": "npx hardhat run --network testnet migrate/utils/cleanInfo.js && npx hardhat run --network testnet migrate/utils/initCollection.js &&  npx hardhat run --network testnet migrate/utils/verifyWallets.js"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
@@ -29,6 +30,7 @@
     "dotenv": "^10.0.0",
     "hardhat-contract-sizer": "^2.5.1",
     "hardhat-gas-reporter": "^1.0.8",
+    "mongoose": "^6.5.0",
     "solidity-coverage": "^0.7.21"
   }
 }
