@@ -18,7 +18,6 @@ async function main(network) {
 
   //Delete collections
   await Collection.deleteMany({});
-  await profiles.deleteMany({});
 
   //Delete Nfts
   await Nft.deleteMany({});

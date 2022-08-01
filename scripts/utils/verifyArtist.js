@@ -21,7 +21,7 @@ async function main(network) {
   );
 
   await verification.verificateAddress(
-    "0x8c6ce70D3ab8E962c29458D5fF711f670790711f"
+    "0x1d5318c25AcDCc270b3f92CcDB72d245836bBCc1"
   );
 
   /* await verification.verificateAddress(
