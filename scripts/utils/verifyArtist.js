@@ -24,22 +24,16 @@ async function main(network) {
     "0x1d92D9a839e9c5D8cc02A7F87E591fF1AdA33268"
   );
   await verification.verificateAddress(
-    "0x41162C850B7176CA0A4310c33F81ffB2E0dCf99F"
+    "0x06b3cC29D74a36f15F1B2beD529Fe45E30CAaf12"
   );
   await verification.verificateAddress(
-    "0x985957b55D06057D0Cb59640D52C6F9f1521D3FE"
+    "0x8c6ce70D3ab8E962c29458D5fF711f670790711f"
   );
   await verification.verificateAddress(
     "0x1d5318c25AcDCc270b3f92CcDB72d245836bBCc1"
   );
   await verification.verificateAddress(
-    "0xDE0D0F1548B16036F6bd9cE759A32D828fF3f15d"
-  );
-  await verification.verificateAddress(
-    "0x07d953152a282FC6F7D56Ef43e680065807EbEe7"
-  );
-  await verification.verificateAddress(
-    "0xdfdc9D40c743BF7804EA100C132f145d64a17362"
+    "0x3a8FDCa22221CC7C67F95520466b1E991B49168d"
   );
 }
 
