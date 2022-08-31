@@ -12,7 +12,7 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const ETHERSCAN_KEY = process.env.ETHERSCAN_KEY;
 module.exports = {
   solidity: {
-    version: "0.8.6",
+    version: "0.8.9",
     settings: {
       optimizer: {
         enabled: true,

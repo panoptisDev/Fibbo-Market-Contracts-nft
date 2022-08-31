@@ -18,6 +18,9 @@ contract FibboAddressRegistry is OwnableUpgradeable {
     /// @notice FibboAuction contract
     address public auction;
 
+    /// @notice FibboAuction contract
+    address public factory;
+
     /// @notice FibboMarketplace contract
     address public community;
 
@@ -53,6 +56,14 @@ contract FibboAddressRegistry is OwnableUpgradeable {
      */
     function updateMarketplace(address _marketplace) external onlyOwner {
         marketplace = _marketplace;
+    }
+
+    /**
+     @notice Update FibboArtFactory contract
+     @dev Only admin
+     */
+    function updateFactory(address _factory) external onlyOwner {
+        factory = _factory;
     }
 
     /**

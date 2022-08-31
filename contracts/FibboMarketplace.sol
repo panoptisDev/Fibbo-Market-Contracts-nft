@@ -92,6 +92,14 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         uint256 price,
         uint256 deadline
     );
+    event OfferModified(
+        address indexed creator,
+        address indexed nft,
+        uint256 tokenId,
+        address payToken,
+        uint256 price,
+        uint256 deadline
+    );
     event OfferCanceled(
         address indexed creator,
         address indexed nft,
@@ -338,9 +346,7 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     ) external payable nonReentrant isListed(_nftContract, _tokenId, _owner) {
         Listing memory listedItem = listings[_nftContract][_tokenId][_owner];
 
-        uint256 price = listedItem.price;
-
-        uint256 feeAmount = (price * platformFee) / 10000;
+        uint256 feeAmount = (listedItem.price * platformFee) / 10000;
 
         IERC20(_payToken).safeTransferFrom(
             msg.sender,
@@ -352,7 +358,8 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         uint16 royalty = royalties[_nftContract][_tokenId];
 
         if (minter != address(0) && royalty != 0) {
-            uint256 royaltyFee = ((price - feeAmount) * royalty) / 10000;
+            uint256 royaltyFee = ((listedItem.price - feeAmount) * royalty) /
+                10000;
 
             IERC20(_payToken).safeTransferFrom(msg.sender, minter, royaltyFee);
 
@@ -362,7 +369,7 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         IERC20(_payToken).safeTransferFrom(
             msg.sender,
             _owner,
-            price - feeAmount
+            listedItem.price - feeAmount
         );
         // Transfer NFT to buyer
 
@@ -380,7 +387,7 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
             _nftContract,
             _tokenId,
             _payToken,
-            price
+            listedItem.price
         );
 
         delete (listings[_nftContract][_tokenId][_owner]);
@@ -427,6 +434,56 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         );
 
         emit OfferCreated(
+            msg.sender,
+            _nftContract,
+            _tokenId,
+            address(_payToken),
+            _price,
+            _deadline
+        );
+    }
+
+    /// @notice Method for modify exiting offer
+    /// @param _nftContract NFT contract address
+    /// @param _tokenId TokenId
+    /// @param _payToken Paying token
+    /// @param _price price
+    function modifyOffer(
+        address _nftContract,
+        uint256 _tokenId,
+        IERC20 _payToken,
+        uint256 _price,
+        uint256 _deadline
+    ) external offerExists(_nftContract, _tokenId, msg.sender) {
+        require(
+            IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC721) ||
+                IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC1155),
+            "invalid nft address"
+        );
+
+        IFibboAuction auction = IFibboAuction(addressRegistry.auction());
+
+        (, , , uint256 startTime, , bool resulted) = auction.auctions(
+            _nftContract,
+            _tokenId
+        );
+
+        require(
+            startTime == 0 || resulted == true,
+            "cannot place an offer if auction is going on"
+        );
+
+        require(_deadline > _getNow(), "invalid expiration");
+
+        _validPayToken(address(_payToken));
+
+        offers[_nftContract][_tokenId][msg.sender] = Offer(
+            _payToken,
+            _price,
+            _deadline
+        );
+
+        emit OfferModified(
             msg.sender,
             _nftContract,
             _tokenId,

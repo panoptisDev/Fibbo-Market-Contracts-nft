@@ -17,9 +17,13 @@ async function main(network) {
     ADDRESS_REGISTRY
   );
 
-  const auctionAddress = await addressRegistry.auction();
+  await addressRegistry.updateFibboCollection(
+    "0xE99D90205cd12B5F2ec7C693bA6BF27591a35D91"
+  );
 
-  const auctionProxy = await ethers.getContractAt(
+  //const auctionAddress = await addressRegistry.auction();
+
+  /*  const auctionProxy = await ethers.getContractAt(
     "FibboAuction",
     auctionAddress
   );
@@ -30,7 +34,7 @@ async function main(network) {
 
   console.log("FibboAuction deployed to: ", auctionImpl.address);
 
-  await proxyAdmin.upgrade(auctionProxy.address, auctionImpl.address);
+  await proxyAdmin.upgrade(auctionProxy.address, auctionImpl.address); */
 }
 
 main(network)

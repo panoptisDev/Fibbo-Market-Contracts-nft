@@ -1,0 +1,13 @@
+{
+  "relayer": {
+    "relayerId": "51dedd25-0004-458f-a786-cacd897ef7e1",
+    "name": "FIbboRelayerTest",
+    "address": "0x1f1175101579059a6d8a695a29650eacd6b043b0",
+    "network": "fantomtest",
+    "createdAt": "2022-08-26T10:15:01.938Z",
+    "paused": false,
+    "policies": {},
+    "minBalance": "100000000000000000",
+    "pendingTxCost": "0"
+  }
+}

@@ -56,7 +56,7 @@ async function main(network) {
   console.log("Marketplace Proxy Initialized");
   ////
 
-  //// Marketplace deployement
+  //// Auction deployement
   const Auction = await ethers.getContractFactory("FibboAuction");
   const auctionIml = await Auction.deploy();
   await auctionIml.deployed();
@@ -77,6 +77,32 @@ async function main(network) {
 
   await auction.initialize(TREASURY_ADDRESS, PLATFORM_FEE);
   console.log("Auction Proxy Initialized");
+  ////
+
+  //// Factory deployement
+  const Factory = await ethers.getContractFactory("FibboArtFactory");
+  const factoryImpl = await Factory.deploy();
+  await factoryImpl.deployed();
+
+  console.log("FibboArtFactory deployed to: ", factoryImpl.address);
+
+  const factoryProxy = await AdminUpgradeabilityProxy.deploy(
+    factoryImpl.address,
+    PROXY_ADDRESS,
+    []
+  );
+  await factoryProxy.deployed();
+
+  console.log("FibboArtFactory Proxy deployed at: ", factoryProxy.address);
+  const FACTORY_ADDRESS = factoryProxy.address;
+
+  const factory = await ethers.getContractAt(
+    "FibboArtFactory",
+    FACTORY_ADDRESS
+  );
+
+  await factory.initialize(MARKETPLACE_ADDRESS);
+  console.log("FibboArtFactory Proxy Initialized");
   ////
 
   //// TokenRegistry Deployement
@@ -144,8 +170,16 @@ async function main(network) {
   ////
 
   //// NFT Collections deployement
-  const DefaultCollection = await ethers.getContractFactory("DefaultFibbo");
-  const defaultCollection = await DefaultCollection.deploy(MARKETPLACE_ADDRESS);
+  const DefaultCollection = await ethers.getContractFactory(
+    "FibboArtTradeable"
+  );
+  const defaultCollection = await DefaultCollection.deploy(
+    "Default Fibbo",
+    "FBBO",
+    MARKETPLACE_ADDRESS,
+    VERIFICATION_ADDRESS,
+    deployerAddress
+  );
   await defaultCollection.deployed();
   console.log("DefaultCollection deploted to: ", defaultCollection.address);
   ////
@@ -183,6 +217,8 @@ async function main(network) {
 
   await defaultCollection.updateFibboVerification(VERIFICATION_ADDRESS);
   await marketplace.updateFibboVerification(VERIFICATION_ADDRESS);
+  await community.updateFibboVerification(VERIFICATION_ADDRESS);
+  await factory.updateFibboVerification(VERIFICATION_ADDRESS);
 
   await marketplace.updateAddressRegistry(ADDRESS_REGISTRY);
   await auction.updateAddressRegistry(ADDRESS_REGISTRY);
@@ -193,6 +229,7 @@ async function main(network) {
   await addressRegistry.updateCommunity(community.address);
   await addressRegistry.updateVerification(verification.address);
   await addressRegistry.updateTokenRegistry(tokenRegistry.address);
+  await addressRegistry.updateFactory(factory.address);
 
   await tokenRegistry.add(WRAPPED_FTM_TESTNET);
 

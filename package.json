@@ -4,10 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "rollup -c",
     "deploy-local": "npx hardhat run --network localhost scripts/deploy_all.js",
     "deploy-testnet": "npx hardhat run --network testnet scripts/deploy_all.js",
     "deploy-mainnet": "npx hardhat run --network mainnet scripts/deploy_all.js",
-    "migrate-testnet": "npx hardhat run --network testnet migrate/utils/cleanInfo.js && npx hardhat run --network testnet migrate/utils/initCollection.js &&  npx hardhat run --network testnet migrate/utils/verifyWallets.js"
+    "migrate-testnet": "npx hardhat run --network testnet migrate/utils/cleanInfo.js && npx hardhat run --network testnet migrate/utils/initCollection.js &&  npx hardhat run --network testnet migrate/utils/verifyWallets.js",
+    "deploy-relay-testnet": "npx hardhat run --network testnet scripts/meta/deploy.js",
+    "create-autotask-testnet": "npm run build && node scripts/meta/createAutotask.js"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
@@ -25,9 +28,17 @@
     "hardhat": "^2.4.1"
   },
   "dependencies": {
+    "@opengsn/contracts": "^3.0.0-beta.1",
     "@openzeppelin/contracts-ethereum-package": "^3.0.0",
     "@openzeppelin/test-helpers": "^0.5.15",
+    "@rollup/plugin-commonjs": "^22.0.2",
+    "@rollup/plugin-json": "^4.1.0",
+    "@rollup/plugin-node-resolve": "^13.3.0",
+    "builtin-modules": "^3.3.0",
+    "defender-autotask-client": "^1.28.1",
+    "defender-relay-client": "^1.28.1",
     "dotenv": "^10.0.0",
+    "eth-sig-util": "^3.0.1",
     "hardhat-contract-sizer": "^2.5.1",
     "hardhat-gas-reporter": "^1.0.8",
     "mongoose": "^6.5.0",

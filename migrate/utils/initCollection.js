@@ -21,6 +21,7 @@ async function main(network) {
     contractAddress: collectionAddress,
     name: "Default Collection",
     numberOfItems: 0,
+    creator: "public",
   });
 }
 
