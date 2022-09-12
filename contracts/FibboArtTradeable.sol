@@ -4,6 +4,8 @@ pragma solidity ^0.8.6;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/metatx/MinimalForwarder.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 
 interface IFibboVerification {
     function checkIfVerified(address) external view returns (bool);
@@ -15,8 +17,10 @@ interface IFibboVerification {
  * has mint functionality, and supports useful standards from OpenZeppelin,
   like _exists(), name(), symbol(), and totalSupply()
  */
-contract FibboArtTradeable is ERC721, Ownable {
+contract FibboArtTradeable is ERC721, ERC2771Context {
     uint256 private _currentTokenID = 0;
+
+    address private _owner;
 
     /// @notice Fibbo Address Verfification
     IFibboVerification public fibboVerification;
@@ -35,16 +39,60 @@ contract FibboArtTradeable is ERC721, Ownable {
     // Fibbo contracts manager
     address contractsManager;
 
+    event OwnershipTransferred(
+        address indexed previousOwner,
+        address indexed newOwner
+    );
+
+    address public minimalForwarder;
+
     constructor(
         string memory _name,
         string memory _symbol,
         address _marketplace,
         address _verification,
-        address _contractsManager
-    ) public ERC721(_name, _symbol) {
+        address _contractsManager,
+        address forwarder
+    ) public ERC721(_name, _symbol) ERC2771Context(forwarder) {
         marketplace = _marketplace;
         fibboVerification = IFibboVerification(_verification);
         contractsManager = _contractsManager;
+        minimalForwarder = forwarder;
+        _owner = _msgSender();
+    }
+
+    function owner() public view virtual returns (address) {
+        return _owner;
+    }
+
+    function _msgSender()
+        internal
+        view
+        override(ERC2771Context, Context)
+        returns (address sender)
+    {
+        if (isTrustedForwarder(msg.sender)) {
+            // The assembly code is more direct than the Solidity version using `abi.decode`.
+            /// @solidity memory-safe-assembly
+            assembly {
+                sender := shr(96, calldataload(sub(calldatasize(), 20)))
+            }
+        } else {
+            return super._msgSender();
+        }
+    }
+
+    function _msgData()
+        internal
+        view
+        override(ERC2771Context, Context)
+        returns (bytes calldata)
+    {
+        if (isTrustedForwarder(msg.sender)) {
+            return msg.data[:msg.data.length - 20];
+        } else {
+            return super._msgData();
+        }
     }
 
     modifier onlyCreator(uint256 _tokenId, address _requester) {
@@ -55,6 +103,15 @@ contract FibboArtTradeable is ERC721, Ownable {
             "Caller not allowed!"
         );
         _;
+    }
+
+    modifier onlyOwner() {
+        _checkOwner();
+        _;
+    }
+
+    function _checkOwner() internal view virtual {
+        require(_owner == _msgSender(), "Ownable: caller is not the owner");
     }
 
     function uri(uint256 _id) public view returns (string memory) {
@@ -78,6 +135,49 @@ contract FibboArtTradeable is ERC721, Ownable {
         setApprovalForAll(marketplace, true);
 
         return _id;
+    }
+
+    /**
+     * @dev Burns an existing token
+     * @param tokenId tokenId about to be burned
+     */
+    function burn(uint256 tokenId) public returns (uint256) {
+        require(_exists(tokenId), "The token dont exist");
+
+        address owner = ownerOf(tokenId);
+        require(
+            owner == _msgSender(),
+            "You need to be the owner in order to burn!"
+        );
+
+        _burn(tokenId);
+    }
+
+    /**
+     * @dev See {IERC721-setApprovalForAll}.
+     */
+    function setApprovalForAll(address operator, bool approved)
+        public
+        override
+    {
+        _setApprovalForAll(_msgSender(), operator, approved);
+    }
+
+    /**
+     * @dev See {IERC721-transferFrom}.
+     */
+    function transferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) public override {
+        //solhint-disable-next-line max-line-length
+        require(
+            _isApprovedOrOwner(_msgSender(), tokenId),
+            "ERC721: caller is not token owner or approved"
+        );
+
+        _transfer(from, to, tokenId);
     }
 
     /**
@@ -167,7 +267,29 @@ contract FibboArtTradeable is ERC721, Ownable {
         _tokenURIs[_id] = _uri;
     }
 
-    function updateFibboVerification(address _verification) external onlyOwner {
+    function updateFibboVerification(address _verification) external {
         fibboVerification = IFibboVerification(_verification);
+    }
+
+    /**
+     * @dev Transfers ownership of the contract to a new account (`newOwner`).
+     * Can only be called by the current owner.
+     */
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        require(
+            newOwner != address(0),
+            "Ownable: new owner is the zero address"
+        );
+        _transferOwnership(newOwner);
+    }
+
+    /**
+     * @dev Transfers ownership of the contract to a new account (`newOwner`).
+     * Internal function without access restriction.
+     */
+    function _transferOwnership(address newOwner) internal virtual {
+        address oldOwner = _owner;
+        _owner = newOwner;
+        emit OwnershipTransferred(oldOwner, newOwner);
     }
 }

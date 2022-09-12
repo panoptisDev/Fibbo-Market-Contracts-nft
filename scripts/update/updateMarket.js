@@ -7,7 +7,7 @@ const { getConstants } = require("../constants");
 async function main(network) {
   console.log("Network is ", network.name);
 
-  const { PROXY_ADDRESS, ADDRESS_REGISTRY, PLATFORM_FEE } =
+  const { PROXY_ADDRESS, ADDRESS_REGISTRY, FORWARDER, PLATFORM_FEE } =
     getConstants(network);
 
   const proxyAdmin = await ethers.getContractAt("ProxyAdmin", PROXY_ADDRESS);
@@ -25,7 +25,7 @@ async function main(network) {
   );
 
   const Marketplace = await ethers.getContractFactory("FibboMarketplace");
-  const marketplaceImpl = await Marketplace.deploy();
+  const marketplaceImpl = await Marketplace.deploy(FORWARDER);
   await marketplaceImpl.deployed();
 
   console.log("FibboMarkeplace deployed to: ", marketplaceImpl.address);

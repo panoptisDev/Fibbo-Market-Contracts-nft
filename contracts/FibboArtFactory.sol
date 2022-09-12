@@ -4,11 +4,13 @@ pragma solidity ^0.8.6;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
+import "@openzeppelin/contracts/metatx/MinimalForwarder.sol";
 import "./FibboArtTradeable.sol";
 
-contract FibboArtFactory is OwnableUpgradeable {
+contract FibboArtFactory is OwnableUpgradeable, ERC2771ContextUpgradeable {
     /// @dev Events of the contract
-    event ContractCreated(address creator, address nft);
+    event ContractCreated(address creator, address nft, string name);
     event ContractDisabled(address caller, address nft);
 
     /// @notice Fantom marketplace contract address;
@@ -22,11 +24,47 @@ contract FibboArtFactory is OwnableUpgradeable {
 
     IFibboVerification fibboVerification;
 
+    address public metaTxforwarder;
+
+    constructor(address forwarder) public ERC2771ContextUpgradeable(forwarder) {
+        metaTxforwarder = forwarder;
+    }
+
     /// @notice Contract initializer
     function initialize(address _marketplace) public initializer {
         marketplace = _marketplace;
 
         __Ownable_init();
+    }
+
+    function _msgSender()
+        internal
+        view
+        override(ERC2771ContextUpgradeable, ContextUpgradeable)
+        returns (address sender)
+    {
+        if (isTrustedForwarder(msg.sender)) {
+            // The assembly code is more direct than the Solidity version using `abi.decode`.
+            /// @solidity memory-safe-assembly
+            assembly {
+                sender := shr(96, calldataload(sub(calldatasize(), 20)))
+            }
+        } else {
+            return super._msgSender();
+        }
+    }
+
+    function _msgData()
+        internal
+        view
+        override(ERC2771ContextUpgradeable, ContextUpgradeable)
+        returns (bytes calldata)
+    {
+        if (isTrustedForwarder(msg.sender)) {
+            return msg.data[:msg.data.length - 20];
+        } else {
+            return super._msgData();
+        }
     }
 
     modifier isVerifiedAddress(address _address) {
@@ -48,22 +86,23 @@ contract FibboArtFactory is OwnableUpgradeable {
     /// @notice Method for deploy new FantomArtTradable contract
     /// @param _name Name of NFT contract
     /// @param _symbol Symbol of NFT contract
-    function createNFTContract(string memory _name, string memory _symbol)
-        external
-        payable
-        isVerifiedAddress(msg.sender)
-        returns (address)
-    {
+    function createNFTContract(
+        string memory _name,
+        string memory _symbol,
+        address _forwarder,
+        address _creator
+    ) external payable isVerifiedAddress(_creator) returns (address) {
         FibboArtTradeable nft = new FibboArtTradeable(
             _name,
             _symbol,
             marketplace,
             address(fibboVerification),
-            owner()
+            owner(),
+            _forwarder
         );
         exists[address(nft)] = true;
-        nft.transferOwnership(msg.sender);
-        emit ContractCreated(msg.sender, address(nft));
+        nft.transferOwnership(_creator);
+        emit ContractCreated(_creator, address(nft), _name);
         return address(nft);
     }
 

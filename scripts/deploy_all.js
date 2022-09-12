@@ -3,7 +3,7 @@
 // then run: npx hardhat run --network localhost scripts/12_deploy_all.js
 
 const WRAPPED_FTM_MAINNET = "0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83";
-const WRAPPED_FTM_TESTNET = "0xf1277d1ed8ad466beddf92ef448a132661956621";
+const WRAPPED_FTM_TESTNET = "0x4EEf747dC4f5d110d9bCfA5C6F24b3359bD4B2d4";
 
 const { getConstants } = require("./constants");
 
@@ -14,7 +14,7 @@ async function main(network) {
   const deployerAddress = await deployer.getAddress();
   console.log(`Deployer's address: `, deployerAddress);
 
-  const { TREASURY_ADDRESS, PLATFORM_FEE } = getConstants(network);
+  const { TREASURY_ADDRESS, PLATFORM_FEE, FORWARDER } = getConstants(network);
 
   //// Proxy deployement
   const ProxyAdmin = await ethers.getContractFactory("ProxyAdmin");
@@ -32,7 +32,7 @@ async function main(network) {
 
   //// Marketplace deployement
   const Marketplace = await ethers.getContractFactory("FibboMarketplace");
-  const marketplaceImpl = await Marketplace.deploy();
+  const marketplaceImpl = await Marketplace.deploy(FORWARDER);
   await marketplaceImpl.deployed();
 
   console.log("FibboMarkeplace deployed to: ", marketplaceImpl.address);
@@ -58,7 +58,7 @@ async function main(network) {
 
   //// Auction deployement
   const Auction = await ethers.getContractFactory("FibboAuction");
-  const auctionIml = await Auction.deploy();
+  const auctionIml = await Auction.deploy(FORWARDER);
   await auctionIml.deployed();
 
   console.log("FibboMarkeplace deployed to: ", auctionIml.address);
@@ -81,7 +81,7 @@ async function main(network) {
 
   //// Factory deployement
   const Factory = await ethers.getContractFactory("FibboArtFactory");
-  const factoryImpl = await Factory.deploy();
+  const factoryImpl = await Factory.deploy(FORWARDER);
   await factoryImpl.deployed();
 
   console.log("FibboArtFactory deployed to: ", factoryImpl.address);
@@ -169,21 +169,6 @@ async function main(network) {
   console.log("Verification proxy initalized");
   ////
 
-  //// NFT Collections deployement
-  const DefaultCollection = await ethers.getContractFactory(
-    "FibboArtTradeable"
-  );
-  const defaultCollection = await DefaultCollection.deploy(
-    "Default Fibbo",
-    "FBBO",
-    MARKETPLACE_ADDRESS,
-    VERIFICATION_ADDRESS,
-    deployerAddress
-  );
-  await defaultCollection.deployed();
-  console.log("DefaultCollection deploted to: ", defaultCollection.address);
-  ////
-
   //// AddressRegistry deployement
   const AddressRegistry = await ethers.getContractFactory(
     "FibboAddressRegistry"
@@ -215,7 +200,6 @@ async function main(network) {
 
   console.log("AddressRegistry proxy initalized");
 
-  await defaultCollection.updateFibboVerification(VERIFICATION_ADDRESS);
   await marketplace.updateFibboVerification(VERIFICATION_ADDRESS);
   await community.updateFibboVerification(VERIFICATION_ADDRESS);
   await factory.updateFibboVerification(VERIFICATION_ADDRESS);
@@ -223,7 +207,6 @@ async function main(network) {
   await marketplace.updateAddressRegistry(ADDRESS_REGISTRY);
   await auction.updateAddressRegistry(ADDRESS_REGISTRY);
 
-  await addressRegistry.updateFibboCollection(defaultCollection.address);
   await addressRegistry.updateMarketplace(marketplace.address);
   await addressRegistry.updateAuction(auction.address);
   await addressRegistry.updateCommunity(community.address);

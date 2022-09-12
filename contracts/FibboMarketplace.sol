@@ -7,6 +7,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/metatx/MinimalForwarder.sol";
+import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 
 interface IFibboTokenRegistry {
     function enabled(address) external view returns (bool);
@@ -50,7 +52,11 @@ interface IFibboVerification {
     function checkIfVerifiedInversor(address) external view returns (bool);
 }
 
-contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract FibboMarketplace is
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    ERC2771ContextUpgradeable
+{
     //using AddressUpgradeable for address payable;
     using SafeERC20 for IERC20;
 
@@ -148,6 +154,15 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     mapping(address => mapping(uint256 => mapping(address => Offer)))
         public offers;
 
+    address public immutable forwarder;
+
+    constructor(address _forwarder)
+        public
+        ERC2771ContextUpgradeable(_forwarder)
+    {
+        forwarder = _forwarder;
+    }
+
     /// @notice Contract initializer
     function initialize(address payable _feeRecipient, uint16 _platformFee)
         public
@@ -158,6 +173,36 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         __Ownable_init();
         __ReentrancyGuard_init();
+    }
+
+    function _msgSender()
+        internal
+        view
+        override(ERC2771ContextUpgradeable, ContextUpgradeable)
+        returns (address sender)
+    {
+        if (isTrustedForwarder(msg.sender)) {
+            // The assembly code is more direct than the Solidity version using `abi.decode`.
+            /// @solidity memory-safe-assembly
+            assembly {
+                sender := shr(96, calldataload(sub(calldatasize(), 20)))
+            }
+        } else {
+            return super._msgSender();
+        }
+    }
+
+    function _msgData()
+        internal
+        view
+        override(ERC2771ContextUpgradeable, ContextUpgradeable)
+        returns (bytes calldata)
+    {
+        if (isTrustedForwarder(msg.sender)) {
+            return msg.data[:msg.data.length - 20];
+        } else {
+            return super._msgData();
+        }
     }
 
     modifier isListed(
@@ -252,17 +297,17 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         uint256 _startingTime
     )
         external
-        isVerifiedAddress(msg.sender)
-        notListed(_nftContract, _tokenId, msg.sender)
+        isVerifiedAddress(_msgSender())
+        notListed(_nftContract, _tokenId, _msgSender())
     {
         if (IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC721)) {
             IERC721 nft = IERC721(_nftContract);
             require(
-                nft.ownerOf(_tokenId) == msg.sender,
+                nft.ownerOf(_tokenId) == _msgSender(),
                 "Sender don't own item!"
             );
             require(
-                nft.isApprovedForAll(msg.sender, address(this)),
+                nft.isApprovedForAll(_msgSender(), address(this)),
                 "Item is not approved!"
             );
         } else {
@@ -271,14 +316,14 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         _validPayToken(_payToken);
 
-        listings[_nftContract][_tokenId][msg.sender] = Listing(
+        listings[_nftContract][_tokenId][_msgSender()] = Listing(
             _payToken,
             _price,
             _startingTime
         );
 
         emit ItemListed(
-            msg.sender,
+            _msgSender(),
             _nftContract,
             _tokenId,
             _payToken,
@@ -291,10 +336,10 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     function cancelListing(address _nftContract, uint256 _tokenId)
         external
         nonReentrant
-        isListed(_nftContract, _tokenId, msg.sender)
-        isVerifiedAddress(msg.sender)
+        isListed(_nftContract, _tokenId, _msgSender())
+        isVerifiedAddress(_msgSender())
     {
-        _cancelListing(_nftContract, _tokenId, msg.sender);
+        _cancelListing(_nftContract, _tokenId, _msgSender());
     }
 
     /// @notice Method for updating listed NFT
@@ -310,21 +355,21 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     )
         external
         nonReentrant
-        isListed(_nftContract, _tokenId, msg.sender)
-        isVerifiedAddress(msg.sender)
+        isListed(_nftContract, _tokenId, _msgSender())
+        isVerifiedAddress(_msgSender())
     {
         Listing storage listedItem = listings[_nftContract][_tokenId][
-            msg.sender
+            _msgSender()
         ];
 
-        _validOwner(_nftContract, _tokenId, msg.sender);
+        _validOwner(_nftContract, _tokenId, _msgSender());
 
         _validPayToken(_payToken);
 
         listedItem.payToken = _payToken;
         listedItem.price = _newPrice;
         emit ItemUpdated(
-            msg.sender,
+            _msgSender(),
             _nftContract,
             _tokenId,
             _payToken,
@@ -349,7 +394,7 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         uint256 feeAmount = (listedItem.price * platformFee) / 10000;
 
         IERC20(_payToken).safeTransferFrom(
-            msg.sender,
+            _msgSender(),
             feeReceipient,
             feeAmount
         );
@@ -361,13 +406,17 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
             uint256 royaltyFee = ((listedItem.price - feeAmount) * royalty) /
                 10000;
 
-            IERC20(_payToken).safeTransferFrom(msg.sender, minter, royaltyFee);
+            IERC20(_payToken).safeTransferFrom(
+                _msgSender(),
+                minter,
+                royaltyFee
+            );
 
             feeAmount = feeAmount + royaltyFee;
         }
 
         IERC20(_payToken).safeTransferFrom(
-            msg.sender,
+            _msgSender(),
             _owner,
             listedItem.price - feeAmount
         );
@@ -376,14 +425,14 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         if (IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC721)) {
             IERC721(_nftContract).safeTransferFrom(
                 _owner,
-                msg.sender,
+                _msgSender(),
                 _tokenId
             );
         }
 
         emit ItemSold(
             _owner,
-            msg.sender,
+            _msgSender(),
             _nftContract,
             _tokenId,
             _payToken,
@@ -404,7 +453,7 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         IERC20 _payToken,
         uint256 _price,
         uint256 _deadline
-    ) external offerNotExists(_nftContract, _tokenId, msg.sender) {
+    ) external offerNotExists(_nftContract, _tokenId, _msgSender()) {
         require(
             IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC721) ||
                 IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC1155),
@@ -427,14 +476,14 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         _validPayToken(address(_payToken));
 
-        offers[_nftContract][_tokenId][msg.sender] = Offer(
+        offers[_nftContract][_tokenId][_msgSender()] = Offer(
             _payToken,
             _price,
             _deadline
         );
 
         emit OfferCreated(
-            msg.sender,
+            _msgSender(),
             _nftContract,
             _tokenId,
             address(_payToken),
@@ -454,7 +503,7 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         IERC20 _payToken,
         uint256 _price,
         uint256 _deadline
-    ) external offerExists(_nftContract, _tokenId, msg.sender) {
+    ) external offerExists(_nftContract, _tokenId, _msgSender()) {
         require(
             IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC721) ||
                 IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC1155),
@@ -477,14 +526,14 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         _validPayToken(address(_payToken));
 
-        offers[_nftContract][_tokenId][msg.sender] = Offer(
+        offers[_nftContract][_tokenId][_msgSender()] = Offer(
             _payToken,
             _price,
             _deadline
         );
 
         emit OfferModified(
-            msg.sender,
+            _msgSender(),
             _nftContract,
             _tokenId,
             address(_payToken),
@@ -498,10 +547,10 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     /// @param _tokenId TokenId
     function cancelOffer(address _nftContract, uint256 _tokenId)
         external
-        offerExists(_nftContract, _tokenId, msg.sender)
+        offerExists(_nftContract, _tokenId, _msgSender())
     {
-        delete (offers[_nftContract][_tokenId][msg.sender]);
-        emit OfferCanceled(msg.sender, _nftContract, _tokenId);
+        delete (offers[_nftContract][_tokenId][_msgSender()]);
+        emit OfferCanceled(_msgSender(), _nftContract, _tokenId);
     }
 
     /// @notice Method for canceling all the non acceptedOffers
@@ -511,7 +560,9 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         address _nftContract,
         uint256 _tokenId,
         address _creator
-    ) external offerExists(_nftContract, _tokenId, _creator) onlyOwner {
+    ) external onlyOwner {
+        Offer memory offer = offers[_nftContract][_tokenId][_creator];
+        require(offer.price != 0, "offer not exists");
         delete (offers[_nftContract][_tokenId][_creator]);
         emit OfferCanceled(_creator, _nftContract, _tokenId);
     }
@@ -527,7 +578,7 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     ) external nonReentrant offerExists(_nftContract, _tokenId, _creator) {
         Offer memory offer = offers[_nftContract][_tokenId][_creator];
 
-        _validOwner(_nftContract, _tokenId, msg.sender);
+        _validOwner(_nftContract, _tokenId, _msgSender());
 
         uint256 price = offer.price;
 
@@ -546,21 +597,21 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         offer.payToken.safeTransferFrom(
             _creator,
-            msg.sender,
+            _msgSender(),
             price - feeAmount
         );
 
         // Transfer NFT to buyer
         if (IERC165(_nftContract).supportsInterface(INTERFACE_ID_ERC721)) {
             IERC721(_nftContract).safeTransferFrom(
-                msg.sender,
+                _msgSender(),
                 _creator,
                 _tokenId
             );
         }
 
         emit ItemSold(
-            msg.sender,
+            _msgSender(),
             _creator,
             _nftContract,
             _tokenId,
@@ -570,7 +621,7 @@ contract FibboMarketplace is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         emit OfferCanceled(_creator, _nftContract, _tokenId);
 
-        delete (listings[_nftContract][_tokenId][msg.sender]);
+        delete (listings[_nftContract][_tokenId][_msgSender()]);
         delete (offers[_nftContract][_tokenId][_creator]);
     }
 

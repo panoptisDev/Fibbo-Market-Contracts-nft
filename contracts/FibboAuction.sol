@@ -8,8 +8,8 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/metatx/MinimalForwarder.sol";
+import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 
 interface IFibboAddressRegistry {
     function artion() external view returns (address);
@@ -32,7 +32,11 @@ interface IFibboTokenRegistry {
 /**
  * @notice Secondary sale auction contract for NFTs
  */
-contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract FibboAuction is
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    ERC2771ContextUpgradeable
+{
     using AddressUpgradeable for address payable;
     using SafeERC20 for IERC20;
 
@@ -161,11 +165,16 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
     modifier onlyMarketplace() {
         require(
-            addressRegistry.marketplace() == msg.sender,
+            addressRegistry.marketplace() == _msgSender(),
             "not marketplace contract"
         );
         _;
     }
+
+    constructor(address forwarder)
+        public
+        ERC2771ContextUpgradeable(forwarder)
+    {}
 
     /// @notice Contract initializer
     function initialize(
@@ -182,6 +191,36 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         __Ownable_init();
         __ReentrancyGuard_init();
+    }
+
+    function _msgSender()
+        internal
+        view
+        override(ERC2771ContextUpgradeable, ContextUpgradeable)
+        returns (address sender)
+    {
+        if (isTrustedForwarder(msg.sender)) {
+            // The assembly code is more direct than the Solidity version using `abi.decode`.
+            /// @solidity memory-safe-assembly
+            assembly {
+                sender := shr(96, calldataload(sub(calldatasize(), 20)))
+            }
+        } else {
+            return super._msgSender();
+        }
+    }
+
+    function _msgData()
+        internal
+        view
+        override(ERC2771ContextUpgradeable, ContextUpgradeable)
+        returns (bytes calldata)
+    {
+        if (isTrustedForwarder(msg.sender)) {
+            return msg.data[:msg.data.length - 20];
+        } else {
+            return super._msgData();
+        }
     }
 
     /**
@@ -208,9 +247,9 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     ) external {
         // Ensure this contract is approved to move the token
         require(
-            IERC721(_nftContract).ownerOf(_tokenId) == msg.sender &&
+            IERC721(_nftContract).ownerOf(_tokenId) == _msgSender() &&
                 IERC721(_nftContract).isApprovedForAll(
-                    msg.sender,
+                    _msgSender(),
                     address(this)
                 ),
             "not owner and or contract not approved"
@@ -236,34 +275,6 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         );
     }
 
-    /**
-     @notice Places a new bid, out bidding the existing bidder if found and criteria is reached
-     @dev Only callable when the auction is open
-     @dev Bids from smart contracts are prohibited to prevent griefing with always reverting receiver
-     @param _nftContract ERC 721 Address
-     @param _tokenId Token ID of the item being auctioned
-     */
-    /* function placeBid(address _nftContract, uint256 _tokenId)
-        external
-        payable
-        nonReentrant
-        whenNotPaused
-    {
-        require(msg.sender.isContract() == false, "no contracts permitted");
-
-        // Check the auction to see if this is a valid bid
-        Auction memory auction = auctions[_nftContract][_tokenId];
-
-        // Ensure auction is in flight
-        require(
-            _getNow() >= auction.startTime && _getNow() <= auction.endTime,
-            "bidding outside of the auction window"
-        );
-        require(auction.payToken == address(0), "invalid pay token");
-
-        _placeBid(_nftContract, _tokenId, msg.value);
-    }
- */
     /**
      @notice Places a new bid, out bidding the existing bidder if found and criteria is reached
      @dev Only callable when the auction is open
@@ -319,7 +330,7 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         if (auction.payToken != address(0)) {
             IERC20 payToken = IERC20(auction.payToken);
             require(
-                payToken.transferFrom(msg.sender, address(this), _bidAmount),
+                payToken.transferFrom(_msgSender(), address(this), _bidAmount),
                 "insufficient balance or not approved"
             );
         }
@@ -335,11 +346,11 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         }
 
         // assign top bidder and bid time
-        highestBid.bidder = payable(msg.sender);
+        highestBid.bidder = payable(_msgSender());
         highestBid.bid = _bidAmount;
         highestBid.lastBidTime = _getNow();
 
-        emit BidPlaced(_nftContract, _tokenId, msg.sender, _bidAmount);
+        emit BidPlaced(_nftContract, _tokenId, _msgSender(), _bidAmount);
     }
 
     /**
@@ -357,7 +368,7 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         // Ensure highest bidder is the caller
         require(
-            highestBid.bidder == msg.sender,
+            highestBid.bidder == _msgSender(),
             "you are not the highest bidder"
         );
 
@@ -377,11 +388,11 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         _refundHighestBidder(
             _nftContract,
             _tokenId,
-            payable(msg.sender),
+            payable(_msgSender()),
             previousBid
         );
 
-        emit BidWithdrawn(_nftContract, _tokenId, msg.sender, previousBid);
+        emit BidWithdrawn(_nftContract, _tokenId, _msgSender(), previousBid);
     }
 
     //////////
@@ -549,7 +560,7 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         // Ensure this contract is approved to move the token
         require(
-            IERC721(_nftContract).isApprovedForAll(msg.sender, address(this)),
+            IERC721(_nftContract).isApprovedForAll(_msgSender(), address(this)),
             "auction not approved"
         );
 
@@ -567,7 +578,7 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
             10000;
 
         payToken.safeTransferFrom(
-            msg.sender,
+            _msgSender(),
             platformFeeRecipient,
             platformFeeAboveReserve
         );
@@ -585,19 +596,19 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         if (minter != address(0) && royalty != 0) {
             uint256 royaltyFee = (payAmount * royalty) / 10000;
 
-            payToken.safeTransferFrom(msg.sender, minter, royaltyFee);
+            payToken.safeTransferFrom(_msgSender(), minter, royaltyFee);
 
             payAmount = payAmount - royaltyFee;
         }
 
         if (payAmount > 0) {
-            payToken.safeTransferFrom(msg.sender, auctionOwner, payAmount);
+            payToken.safeTransferFrom(_msgSender(), auctionOwner, payAmount);
         }
 
         // Transfer the token to the winner
         IERC721(_nftContract).safeTransferFrom(
             IERC721(_nftContract).ownerOf(_tokenId),
-            msg.sender,
+            _msgSender(),
             _tokenId
         );
 
@@ -605,7 +616,7 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
             auction.owner,
             _nftContract,
             _tokenId,
-            msg.sender,
+            _msgSender(),
             auction.payToken,
             buyNowPrice
         );
@@ -662,8 +673,8 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         Auction memory auction = auctions[_nftContract][_tokenId];
 
         require(
-            IERC721(_nftContract).ownerOf(_tokenId) == msg.sender &&
-                msg.sender == auction.owner,
+            IERC721(_nftContract).ownerOf(_tokenId) == _msgSender() &&
+                _msgSender() == auction.owner,
             "sender must be owner"
         );
         // Check auction is real
@@ -724,7 +735,7 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     ) external {
         Auction storage auction = auctions[_nftContract][_tokenId];
 
-        require(msg.sender == auction.owner, "sender must be item owner");
+        require(_msgSender() == auction.owner, "sender must be item owner");
 
         // Ensure auction not already resulted
         require(!auction.resulted, "auction already resulted");
@@ -755,7 +766,7 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     ) external {
         Auction storage auction = auctions[_nftContract][_tokenId];
 
-        require(msg.sender == auction.owner, "sender must be owner");
+        require(_msgSender() == auction.owner, "sender must be owner");
 
         require(_startTime > 0, "invalid start time");
 
@@ -790,7 +801,7 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     ) external {
         Auction storage auction = auctions[_nftContract][_tokenId];
 
-        require(msg.sender == auction.owner, "sender must be owner");
+        require(_msgSender() == auction.owner, "sender must be owner");
 
         // Check the auction has not ended
         require(_getNow() < auction.endTime, "auction already ended");
@@ -929,7 +940,7 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         // Setup the auction
         auctions[_nftContract][_tokenId] = Auction({
-            owner: msg.sender,
+            owner: _msgSender(),
             payToken: _payToken,
             minBid: minimumBid,
             buyNowPrice: _buyNowPrice,
@@ -1005,6 +1016,6 @@ contract FibboAuction is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         require(_tokenContract != address(0), "Invalid address");
         IERC20 token = IERC20(_tokenContract);
         uint256 balance = token.balanceOf(address(this));
-        require(token.transfer(msg.sender, balance), "Transfer failed");
+        require(token.transfer(_msgSender(), balance), "Transfer failed");
     }
 }

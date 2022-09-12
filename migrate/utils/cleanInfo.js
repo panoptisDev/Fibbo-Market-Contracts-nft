@@ -11,7 +11,10 @@ const Suggestion = require("../models/suggestions.js");
 const VerifyRequests = require("../models/verifyRequests.js");
 const Offers = require("../models/offers.js");
 const Auctions = require("../models/auction.js");
-const profiles = require("../models/profiles.js");
+const Notifiactions = require("../models/notifications.js");
+const UserOptions = require("../models/userCollectionOptions.js");
+const HighestBids = require("../models/highestBidders.js");
+const AcceptedOffers = require("../models/acceptedOffers.js");
 
 async function main(network) {
   console.log("Cleaning DB info");
@@ -37,6 +40,18 @@ async function main(network) {
 
   //Delete Auctions
   await Auctions.deleteMany({});
+
+  //Delete userOprions
+  await UserOptions.deleteMany({});
+
+  //Delete Notifiactions
+  await Notifiactions.deleteMany({});
+
+  //Delete HighestBids
+  await HighestBids.deleteMany({});
+
+  //Delete AcceptedOffers
+  await AcceptedOffers.deleteMany({});
 }
 
 main(network)

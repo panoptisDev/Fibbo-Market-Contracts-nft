@@ -34,9 +34,9 @@ async function main() {
     .deploy()
     .then((f) => f.deployed());
 
-  const Factory = await ethers.getContractFactory("FibboArtFactory");
-  const factory = await Factory.connect(relaySigner)
-    .deploy(marketAddress, verification, MANNAGER, forwarder.address)
+  const WFTM = await ethers.getContractFactory("WrappedFtm");
+  const wftm = await WFTM.connect(relaySigner)
+    .deploy(forwarder.address)
     .then((f) => f.deployed());
 
   writeFileSync(
@@ -44,18 +44,14 @@ async function main() {
     JSON.stringify(
       {
         MinimalForwarder: forwarder.address,
-        Factory: factory.address,
+        WFTM: wftm.address,
       },
       null,
       2
     )
   );
 
-  await addressRegistry.updateFactory(factory.address);
-
-  console.log(
-    `MinimalForwarder: ${forwarder.address}\Factory: ${factory.address}`
-  );
+  console.log(`MinimalForwarder: ${forwarder.address}\n WFTM: ${wftm.address}`);
 }
 
 if (require.main === module) {

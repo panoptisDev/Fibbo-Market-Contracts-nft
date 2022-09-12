@@ -7,7 +7,7 @@ const { getConstants } = require("../constants");
 async function main(network) {
   console.log("Network is ", network.name);
 
-  const { PROXY_ADDRESS, ADDRESS_REGISTRY } = getConstants(network);
+  const { PROXY_ADDRESS, ADDRESS_REGISTRY, FORWARDER } = getConstants(network);
 
   const proxyAdmin = await ethers.getContractAt("ProxyAdmin", PROXY_ADDRESS);
 
@@ -22,9 +22,9 @@ async function main(network) {
     "FibboArtFactory",
     factoryAddress
   );
-
+  console.log(FORWARDER);
   const Factory = await ethers.getContractFactory("FibboArtFactory");
-  const factoryImpl = await Factory.deploy();
+  const factoryImpl = await Factory.deploy(FORWARDER);
   await factoryImpl.deployed();
 
   console.log(factoryProxy.address);
