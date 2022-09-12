@@ -2,7 +2,7 @@
 // PROXY -> 0xa513E6E4b8f2a923D98304ec87F64353C4D5C853
 
 const { getConstants } = require("../constants");
-const WRAPPED_FTM_TESTNET = "0xf1277d1ed8ad466beddf92ef448a132661956621";
+const WRAPPED_FTM_TESTNET = "0x4EEf747dC4f5d110d9bCfA5C6F24b3359bD4B2d4";
 async function main(network) {
   console.log("Network is ", network.name);
 

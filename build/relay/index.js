@@ -70,7 +70,7 @@ var forwarder = {
   ForwarderAbi: ForwarderAbi$1,
 };
 
-var MinimalForwarder="0x7687D1fcF56779b19beCBFae93cabAD1EA77878b";var WFTM="0x4EEf747dC4f5d110d9bCfA5C6F24b3359bD4B2d4";var require$$3 = {MinimalForwarder:MinimalForwarder,WFTM:WFTM};
+var MinimalForwarder="0x944f2A65742dbe3963BeDeE9d55cdF02572db6Da";var require$$3 = {MinimalForwarder:MinimalForwarder};
 
 const ethers = require$$0__default["default"];
 const {

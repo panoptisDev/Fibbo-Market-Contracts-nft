@@ -28,7 +28,8 @@ async function main(network) {
     profiles.map(async (profile) => {
       if (profile.verified) {
         try {
-          await verification.verificateAddress(profile.wallet);
+          const tx = await verification.verificateAddress(profile.wallet);
+          await tx.wait();
         } catch (e) {
           console.log(profile.wallet + " is already verified");
         }
