@@ -22,7 +22,7 @@ contract WrappedFtm is ERC20, ERC2771Context {
     // create instance of the wFTM token
     constructor(MinimalForwarder forwarder)
         public
-        ERC20("Wrapped Fantom", "WFTM")
+        ERC20("Fibbo Wrapped Fantom", "FBOFTM")
         ERC2771Context(address(forwarder))
     {}
 
