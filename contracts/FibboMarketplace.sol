@@ -76,7 +76,9 @@ contract FibboMarketplace is
         address indexed nft,
         uint256 tokenId,
         address payToken,
-        uint256 price
+        uint256 price,
+        uint256 fee,
+        uint256 royaltyFee
     );
     event ItemUpdated(
         address indexed owner,
@@ -391,7 +393,8 @@ contract FibboMarketplace is
     ) external payable nonReentrant isListed(_nftContract, _tokenId, _owner) {
         Listing memory listedItem = listings[_nftContract][_tokenId][_owner];
 
-        uint256 feeAmount = (listedItem.price * platformFee) / 10000;
+        uint256 marketFee = (listedItem.price * platformFee) / 10000;
+        uint256 feeAmount = marketFee;
 
         IERC20(_payToken).safeTransferFrom(
             _msgSender(),
@@ -399,16 +402,20 @@ contract FibboMarketplace is
             feeAmount
         );
 
-        address minter = minters[_nftContract][_tokenId];
-        uint16 royalty = royalties[_nftContract][_tokenId];
+        uint256 royaltyFee = 0;
 
-        if (minter != address(0) && royalty != 0) {
-            uint256 royaltyFee = ((listedItem.price - feeAmount) * royalty) /
+        if (
+            minters[_nftContract][_tokenId] != address(0) &&
+            royalties[_nftContract][_tokenId] != 0
+        ) {
+            royaltyFee =
+                ((listedItem.price - feeAmount) *
+                    royalties[_nftContract][_tokenId]) /
                 10000;
 
             IERC20(_payToken).safeTransferFrom(
                 _msgSender(),
-                minter,
+                minters[_nftContract][_tokenId],
                 royaltyFee
             );
 
@@ -436,7 +443,9 @@ contract FibboMarketplace is
             _nftContract,
             _tokenId,
             _payToken,
-            listedItem.price
+            listedItem.price,
+            marketFee,
+            royaltyFee
         );
 
         delete (listings[_nftContract][_tokenId][_owner]);
@@ -580,25 +589,33 @@ contract FibboMarketplace is
 
         _validOwner(_nftContract, _tokenId, _msgSender());
 
-        uint256 price = offer.price;
-
-        uint256 feeAmount = (price * platformFee) / 10000;
+        uint256 marketFee = (offer.price * platformFee) / 10000;
+        uint256 feeAmount = marketFee;
 
         offer.payToken.safeTransferFrom(_creator, feeReceipient, feeAmount);
 
-        address minter = minters[_nftContract][_tokenId];
-        uint16 royalty = royalties[_nftContract][_tokenId];
+        uint256 royaltyFee = 0;
 
-        if (minter != address(0) && royalty != 0) {
-            uint256 royaltyFee = ((price - feeAmount) * royalty) / 10000;
-            offer.payToken.safeTransferFrom(_creator, minter, royaltyFee);
+        if (
+            minters[_nftContract][_tokenId] != address(0) &&
+            royalties[_nftContract][_tokenId] != 0
+        ) {
+            royaltyFee =
+                ((offer.price - feeAmount) *
+                    royalties[_nftContract][_tokenId]) /
+                10000;
+            offer.payToken.safeTransferFrom(
+                _creator,
+                minters[_nftContract][_tokenId],
+                royaltyFee
+            );
             feeAmount = feeAmount + royaltyFee;
         }
 
         offer.payToken.safeTransferFrom(
             _creator,
             _msgSender(),
-            price - feeAmount
+            offer.price - feeAmount
         );
 
         // Transfer NFT to buyer
@@ -616,7 +633,9 @@ contract FibboMarketplace is
             _nftContract,
             _tokenId,
             address(offer.payToken),
-            offer.price
+            offer.price,
+            marketFee,
+            royaltyFee
         );
 
         emit OfferCanceled(_creator, _nftContract, _tokenId);

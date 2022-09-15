@@ -7,8 +7,7 @@ const { getConstants } = require("../constants");
 async function main(network) {
   console.log("Network is ", network.name);
 
-  const { PROXY_ADDRESS, ADDRESS_REGISTRY, PLATFORM_FEE } =
-    getConstants(network);
+  const { PROXY_ADDRESS, ADDRESS_REGISTRY, FORWARDER } = getConstants(network);
 
   const proxyAdmin = await ethers.getContractAt("ProxyAdmin", PROXY_ADDRESS);
 
@@ -17,24 +16,20 @@ async function main(network) {
     ADDRESS_REGISTRY
   );
 
-  await addressRegistry.updateFibboCollection(
-    "0xE99D90205cd12B5F2ec7C693bA6BF27591a35D91"
-  );
+  const auctionAddress = await addressRegistry.auction();
 
-  //const auctionAddress = await addressRegistry.auction();
-
-  /*  const auctionProxy = await ethers.getContractAt(
+  const auctionProxy = await ethers.getContractAt(
     "FibboAuction",
     auctionAddress
   );
 
   const Auction = await ethers.getContractFactory("FibboAuction");
-  const auctionImpl = await Auction.deploy();
+  const auctionImpl = await Auction.deploy(FORWARDER);
   await auctionImpl.deployed();
 
   console.log("FibboAuction deployed to: ", auctionImpl.address);
 
-  await proxyAdmin.upgrade(auctionProxy.address, auctionImpl.address); */
+  await proxyAdmin.upgrade(auctionProxy.address, auctionImpl.address);
 }
 
 main(network)

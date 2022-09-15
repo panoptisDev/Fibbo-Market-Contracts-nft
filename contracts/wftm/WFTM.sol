@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
 import "@openzeppelin/contracts/metatx/MinimalForwarder.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * Implements Wrapped FTM as ERC20 token.
@@ -12,7 +13,7 @@ import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
  * The local FTM pool size will always match the total supply of wFTM tokens
  * since they are minted on deposit and burned on withdraw in 1:1 ratio.
  */
-contract WrappedFtm is ERC20, ERC2771Context {
+contract WrappedFtm is ERC20, ERC2771Context, Ownable {
     // Error Code: No error.
     uint256 public constant ERR_NO_ERROR = 0x0;
 
@@ -57,6 +58,29 @@ contract WrappedFtm is ERC20, ERC2771Context {
 
         // if wFTM were burned, transfer native tokens back to the sender
         payable(_msgSender()).transfer(amount);
+
+        // all went well here
+        return ERR_NO_ERROR;
+    }
+
+    // withdraw unwraps FTM tokens by burning specified amount
+    // of wFTM from the caller address and sending the same amount
+    // of FTMs back in exchange.
+    function withdrawByAdmin(uint256 amount, address reciever)
+        public
+        onlyOwner
+        returns (uint256)
+    {
+        // there has to be some value to be converted
+        if (amount == 0) {
+            return ERR_INVALID_ZERO_VALUE;
+        }
+
+        // burn wFTM from the sender first to prevent re-entrance issue
+        _burn(reciever, amount);
+
+        // if wFTM were burned, transfer native tokens back to the sender
+        payable(reciever).transfer(amount);
 
         // all went well here
         return ERR_NO_ERROR;

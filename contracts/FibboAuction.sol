@@ -101,16 +101,9 @@ contract FibboAuction is
         uint256 indexed tokenId,
         address indexed winner,
         address payToken,
-        uint256 winningBid
-    );
-
-    event AuctionBuyNowResulted(
-        address oldOwner,
-        address indexed nftAddress,
-        uint256 indexed tokenId,
-        address indexed buyer,
-        address payToken,
-        uint256 buyNowPrice
+        uint256 winningBid,
+        uint256 marketFee,
+        uint256 royaltyFee
     );
 
     event AuctionCancelled(address indexed nftAddress, uint256 indexed tokenId);
@@ -415,8 +408,6 @@ contract FibboAuction is
         // Check the auction to see if it can be resulted
         Auction storage auction = auctions[_nftContract][_tokenId];
 
-        address auctionOwner = auction.owner;
-
         // Check the auction real
         require(auction.endTime > 0, "no auction exists");
 
@@ -454,13 +445,13 @@ contract FibboAuction is
         uint256 payAmount;
         IERC20 payToken = IERC20(auction.payToken);
 
+        uint256 platformFeeAboveReserve = 0;
         if (winningBid > auction.reservePrice) {
             // Work out total above the reserve
             uint256 aboveReservePrice = winningBid - auction.reservePrice;
 
             // Work out platform fee from above reserve amount
-            uint256 platformFeeAboveReserve = (aboveReservePrice *
-                platformFee) / 10000;
+            platformFeeAboveReserve = (aboveReservePrice * platformFee) / 10000;
 
             require(
                 payToken.transfer(
@@ -480,14 +471,22 @@ contract FibboAuction is
             addressRegistry.marketplace()
         );
 
-        address minter = marketplace.minters(_nftContract, _tokenId);
-        uint16 royalty = marketplace.royalties(_nftContract, _tokenId);
-        if (minter != address(0) && royalty != 0) {
+        uint256 royaltyFee = 0;
+
+        if (
+            marketplace.minters(_nftContract, _tokenId) != address(0) &&
+            marketplace.royalties(_nftContract, _tokenId) != 0
+        ) {
             IERC20 payToken = IERC20(auction.payToken);
-            uint256 royaltyFee = (payAmount * royalty) / 10000;
+            royaltyFee =
+                (payAmount * marketplace.royalties(_nftContract, _tokenId)) /
+                10000;
 
             require(
-                payToken.transfer(minter, royaltyFee),
+                payToken.transfer(
+                    marketplace.minters(_nftContract, _tokenId),
+                    royaltyFee
+                ),
                 "failed to send the owner their royalties"
             );
             payAmount = payAmount - royaltyFee;
@@ -513,7 +512,9 @@ contract FibboAuction is
             _tokenId,
             winner,
             auction.payToken,
-            winningBid
+            winningBid,
+            platformFeeAboveReserve,
+            royaltyFee
         );
 
         // Remove auction
@@ -532,8 +533,6 @@ contract FibboAuction is
         // Check the auction to see if it can be resulted
         Auction storage auction = auctions[_nftContract][_tokenId];
 
-        address auctionOwner = auction.owner;
-        uint256 buyNowPrice = auction.buyNowPrice;
         // Check the auction real
         require(auction.endTime > 0, "no auction exists");
 
@@ -571,7 +570,7 @@ contract FibboAuction is
         IERC20 payToken = IERC20(auction.payToken);
 
         // Work out total above the reserve
-        uint256 aboveReservePrice = buyNowPrice - auction.reservePrice;
+        uint256 aboveReservePrice = auction.buyNowPrice - auction.reservePrice;
 
         // Work out platform fee from above reserve amount
         uint256 platformFeeAboveReserve = (aboveReservePrice * platformFee) /
@@ -584,25 +583,33 @@ contract FibboAuction is
         );
 
         // Send remaining to designer
-        payAmount = buyNowPrice - platformFeeAboveReserve;
+        payAmount = auction.buyNowPrice - platformFeeAboveReserve;
 
         IFibboMarketplace marketplace = IFibboMarketplace(
             addressRegistry.marketplace()
         );
 
-        address minter = marketplace.minters(_nftContract, _tokenId);
-        uint16 royalty = marketplace.royalties(_nftContract, _tokenId);
+        uint256 royaltyFee = 0;
 
-        if (minter != address(0) && royalty != 0) {
-            uint256 royaltyFee = (payAmount * royalty) / 10000;
+        if (
+            marketplace.minters(_nftContract, _tokenId) != address(0) &&
+            marketplace.royalties(_nftContract, _tokenId) != 0
+        ) {
+            royaltyFee =
+                (payAmount * marketplace.royalties(_nftContract, _tokenId)) /
+                10000;
 
-            payToken.safeTransferFrom(_msgSender(), minter, royaltyFee);
+            payToken.safeTransferFrom(
+                _msgSender(),
+                marketplace.minters(_nftContract, _tokenId),
+                royaltyFee
+            );
 
             payAmount = payAmount - royaltyFee;
         }
 
         if (payAmount > 0) {
-            payToken.safeTransferFrom(_msgSender(), auctionOwner, payAmount);
+            payToken.safeTransferFrom(_msgSender(), auction.owner, payAmount);
         }
 
         // Transfer the token to the winner
@@ -618,7 +625,9 @@ contract FibboAuction is
             _tokenId,
             _msgSender(),
             auction.payToken,
-            buyNowPrice
+            auction.buyNowPrice,
+            platformFeeAboveReserve,
+            royaltyFee
         );
 
         // Remove auction
