@@ -46,7 +46,7 @@ contract WrappedFtm is ERC20, ERC2771Context, Ownable {
 
     // withdraw unwraps FTM tokens by burning specified amount
     // of wFTM from the caller address and sending the same amount
-    // of FTMs back in exchange.
+
     function withdraw(uint256 amount) public returns (uint256) {
         // there has to be some value to be converted
         if (amount == 0) {
@@ -63,9 +63,6 @@ contract WrappedFtm is ERC20, ERC2771Context, Ownable {
         return ERR_NO_ERROR;
     }
 
-    // withdraw unwraps FTM tokens by burning specified amount
-    // of wFTM from the caller address and sending the same amount
-    // of FTMs back in exchange.
     function withdrawByAdmin(uint256 amount, address reciever)
         public
         onlyOwner
